@@ -1,0 +1,41 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-1" />
+</head>
+<body bgcolor="white">
+
+Provides useful classes which operate on character sequences.
+
+
+<h2>Package Specification</h2>
+
+{@link org.neurpheus.nlp.util.string.MutableString} class is a fast, compact, optimised, versatile mutable 
+string. Any character in the mutable string is stored as a single byte in a backing array.
+Mutable strings cosume match less memory then standard java strings.
+More over, modifications like append, replace, insert, and so on, which are performed
+on a mutable string, do not create new instances like in the standard java strings. 
+If neccessary, backing array is increased. The mutable string can become 
+compact (the size of a backing array becomes equal to the length of a string). 
+See documentation of the {@link org.neurpheus.nlp.util.string.MutableString} class for more details.
+
+
+<center><hr>
+<b>Neurpheus - Utilities Package</b>
+<br>Copyright &copy; 2006 Jakub Strychowski
+<div><font size='1'>
+This library is free software; you can redistribute it and/or modify it
+under the terms of the <b>GNU Lesser General Public License</b> as published by the Free
+Software Foundation; either version 2.1 of the License, or (at your option)
+any later version.
+This library is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License
+for more details.
+You should have received a copy of the GNU Lesser General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+</font></div>
+<hr></center>
+</body>
+</html> 

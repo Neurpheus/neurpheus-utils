@@ -1,0 +1,11 @@
+Manifest-Version: 1.0
+
+name: neurpheus-utils
+Package: org.neurpheus.
+Extension-Name: neurpheus-utils
+Specification-Title: Neurpheus Utils
+Specification-Vendor: Neurpheus
+Specification-Version: 1.0.0
+Implementation-Title: Neurpheus Utils
+Implementation-Vendor: Neurpheus
+Implementation-Version: 1.0.1
