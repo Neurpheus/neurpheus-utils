@@ -186,6 +186,12 @@ public abstract class AbstractLinkedListTreeUnitArray implements Serializable, L
     public int[] getValueMapping() {
         return this.valueMapping;
     }
+
+    @Override
+    public Map<Integer, Integer> getReverseValueMapping() {
+        return this.reverseMapping;
+    }
+    
     
     @Override
     public void setValueMapping(int[] mapping ) {
@@ -206,5 +212,33 @@ public abstract class AbstractLinkedListTreeUnitArray implements Serializable, L
         return reverseMapping.get(value);
     }
 
+    @Override
+    public LinkedListTreeUnitArray subArray(int startIndex, int endIndex) {
+        if (startIndex < 0 || startIndex > this.size) {
+            throw new IndexOutOfBoundsException("Invalid startIndex = " + startIndex);
+        }
+        if (endIndex < 0 || endIndex > this.size || endIndex <= startIndex) {
+            throw new IndexOutOfBoundsException("Invalid endIndex = " + endIndex);
+        }
+        return null;
+    }
+
+    @Override
+    public void moveAbsolutePointers(int offset) {
+        for (int i = 0; i < this.size; i++) {
+            if (isAbsolutePointer(i)) {
+                set(i, getDistance(i) + offset, isWordEnd(i), 
+                    isWordContinued(i), getValueCode(i), getDataCode(i));
+            }
+        }
+        
+    }
+
+    public void addAll(LinkedListTreeUnitArray subArray) {
+        for (int i = 0; i < subArray.size(); i++) {
+            add(subArray.get(i));
+        }
+    }
+    
     
 }

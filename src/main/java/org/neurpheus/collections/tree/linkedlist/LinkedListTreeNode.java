@@ -114,8 +114,8 @@ public class LinkedListTreeNode implements TreeNode {
                                 ? new LinkedListTreeDataNode(childPosition)
                                 : new LinkedListTreeNode(childPosition);
                     }
-                    childPosition = valueCode < keyValue ? childPosition.goToNextChild() : null;
-                    //childPosition = childPosition.goToNextChild();
+                    //childPosition = valueCode < keyValue ? childPosition.goToNextChild() : null;
+                    childPosition = childPosition.goToNextChild();
                 }
             }
         }
@@ -476,6 +476,11 @@ public class LinkedListTreeNode implements TreeNode {
     @Override
     public boolean hasExtraData() {
         return false;
+    }
+    
+    
+    public LinkedListPosition getPosition() {
+        return pos;
     }
 
 }

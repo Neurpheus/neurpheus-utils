@@ -93,7 +93,7 @@ public class FastLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitArray
             }
         }
         this.valueMapping = baseArray.getValueMapping();
-        this.reverseMapping = createReverseMapping(valueMapping);
+        this.reverseMapping = baseArray.getReverseValueMapping();
         
     }
     
@@ -342,6 +342,24 @@ public class FastLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitArray
         }
         return res;
     }    
+    
+    @Override
+    public LinkedListTreeUnitArray subArray(int startIndex, int endIndex) {
+        super.subArray(startIndex, endIndex);
+        FastLinkedListTreeUnitArray result = new FastLinkedListTreeUnitArray(endIndex - startIndex);
+        result.valueMapping = this.valueMapping;
+        result.reverseMapping = this.reverseMapping;
+        result.wordContinued = Arrays.copyOfRange(wordContinued, startIndex, endIndex);
+        result.wordEnd = Arrays.copyOfRange(wordEnd, startIndex, endIndex);
+        result.distance = Arrays.copyOfRange(distance, startIndex, endIndex);
+        result.valueCode = Arrays.copyOfRange(valueCode, startIndex, endIndex);
+        result.dataCode = Arrays.copyOfRange(dataCode, startIndex, endIndex);
+        result.size = endIndex - startIndex;
+        return result;
+    }
+
+    
+    
 
     
 }

@@ -61,7 +61,7 @@ public class LinkedListTreeTools {
     public static String checkTree(Tree tree, String filePath, boolean reverse) throws IOException {
         long startTime = System.currentTimeMillis();
         String charset = "utf-8"; //Charset.defaultCharset().name();
-        int numberOfLookups = 0;
+        long numberOfLookups = 0;
         try (BufferedReader reader = Files.newBufferedReader(Paths.get(filePath), Charset.forName(charset))) {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -146,14 +146,14 @@ public class LinkedListTreeTools {
         }
     }
     
-    public static String testTreeCreation(String path, boolean REVERSE) throws IOException {
+    public static String testTreeCreation(String path, boolean reverse, boolean parallelMode) throws IOException {
         LOGGER.info("--------------------------------------------");
         LOGGER.info("Test file: " + path);
         LOGGER.info("--------------------------------------------");
-        Tree baseTree = LinkedListTreeTools.createBaseTree(path, REVERSE);
+        Tree baseTree = LinkedListTreeTools.createBaseTree(path, reverse);
         LOGGER.info("Creating base tree");
         
-        LinkedListTree compressedTree = (LinkedListTree) LinkedListTreeFactory.getInstance().createTree(baseTree, true, true);
+        LinkedListTree compressedTree = (LinkedListTree) LinkedListTreeFactory.getInstance().createTree(baseTree, true, true, parallelMode);
         
         String resultPath;
         if (path.endsWith(".txt")) {
@@ -166,15 +166,15 @@ public class LinkedListTreeTools {
         saveTree(compressedTree, resultPath);
         
         LOGGER.fine("Checking traversal through the tree.");
-        String result = LinkedListTreeTools.checkTree(compressedTree, path, REVERSE);
+        String result = LinkedListTreeTools.checkTree(compressedTree, path, reverse);
         return result;
     }
 
-    public static String testTreeCreation2(String path, boolean REVERSE) throws IOException {
+    public static String testTreeCreation2(String path, boolean reverse, boolean parallelMode) throws IOException {
         LOGGER.info("--------------------------------------------");
         LOGGER.info("Test file: " + path);
         LOGGER.info("--------------------------------------------");
-        Tree baseTree = LinkedListTreeTools.createBaseTree(path, REVERSE);
+        Tree baseTree = LinkedListTreeTools.createBaseTree(path, reverse);
         LOGGER.info("Creating base tree");
         
         List<TreeNode> children = baseTree.getRoot().getChildren();
@@ -183,7 +183,7 @@ public class LinkedListTreeTools {
         long startTime = System.currentTimeMillis();
         for (TreeNode node : children) {
             baseTree.setRoot(node);
-            LinkedListTree compressedTree = (LinkedListTree) LinkedListTreeFactory.getInstance().createTree(baseTree, true, true);
+            LinkedListTree compressedTree = (LinkedListTree) LinkedListTreeFactory.getInstance().createTree(baseTree, true, true, parallelMode);
             subTrees.add(compressedTree);
             allocationSize += compressedTree.getUnitArray().getAllocationSize();
         }
@@ -209,7 +209,7 @@ public class LinkedListTreeTools {
         saveTree(compressedTree, resultPath);
         
         LOGGER.fine("Checking traversal through the tree.");
-        String result = LinkedListTreeTools.checkTree(compressedTree, path, REVERSE);
+        String result = LinkedListTreeTools.checkTree(compressedTree, path, reverse);
         return result;
     }
     
@@ -221,7 +221,8 @@ public class LinkedListTreeTools {
     public static void main(String[] args) {
         String path = args[0];
         try {
-            String result = LinkedListTreeTools.testTreeCreation(path, false);
+            boolean parallelMode = args.length > 1 && "-parallelr".equals(args[1]);
+            String result = LinkedListTreeTools.testTreeCreation(path, false, parallelMode);
             if (result != null) {
                 LOGGER.severe(result);
             }

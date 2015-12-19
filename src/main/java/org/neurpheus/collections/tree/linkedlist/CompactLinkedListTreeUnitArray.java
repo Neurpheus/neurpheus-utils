@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -85,7 +86,8 @@ public class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitAr
     /** Creates a new instance of LinkedListTreeUnitArray */
     public CompactLinkedListTreeUnitArray(LinkedListTreeUnitArray baseArray) {
         super(baseArray.size());
-        setValueMapping(baseArray.getValueMapping());
+        this.valueMapping = baseArray.getValueMapping();
+        this.reverseMapping = baseArray.getReverseValueMapping();
         clear(baseArray.size());
         this.size = baseArray.size();
         for (int i = 0; i < baseArray.size(); i++) {
@@ -458,5 +460,25 @@ public class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitAr
         return res;
     }    
 
+    @Override
+    public LinkedListTreeUnitArray subArray(int startIndex, int endIndex) {
+        super.subArray(startIndex, endIndex);
+        FastLinkedListTreeUnitArray result = new FastLinkedListTreeUnitArray(endIndex - startIndex);
+        
+        int resultIndex = 0;
+        for (int i = startIndex; i < endIndex; i++, resultIndex++) {
+            int fastIndex = getFastIndex(i);
+            result.set(resultIndex, 
+                       getDistanceFast(fastIndex),
+                       isWordEndFast(fastIndex),
+                       isWordContinuedFast(fastIndex),
+                       getValueCode(fastIndex),
+                       getDataCodeFast(fastIndex)
+                       );
+        }
+        
+        return result;
+    }
+    
 
 }

@@ -4,6 +4,14 @@
 
 package org.neurpheus.collections.tree.linkedlist;
 
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import org.junit.Test;
+import org.neurpheus.collections.tree.Tree;
+import org.neurpheus.collections.tree.TreeNode;
+import org.neurpheus.logging.LoggerService;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -14,13 +22,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.logging.Level;
-import java.util.logging.Logger;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import org.junit.Test;
-import org.neurpheus.collections.tree.Tree;
-import org.neurpheus.collections.tree.TreeNode;
-import org.neurpheus.logging.LoggerService;
 
 /**
  *
@@ -30,13 +31,13 @@ public class LinkedListTreeFactoryTest {
 
     private static final char[] SUFFIX_ALPHABET = new char[] { 'a', 'e', 'z', 'x', 'c' ,'v' ,'b', 'n', 'm'};
     private static final char[] THEME_ALPHABET = new char[] { 'a', 'e', 's', 'd' ,'f' ,'g', 'h', 'j', 'k', 'l'};
-    private static final char[] PREFIX_ALPHABET = new char[] { 'w', 'e', 'r'};
+    private static final char[] PREFIX_ALPHABET = new char[] { 'w', 'e', 'r', 't', 'y', 'u'};
     
     private static final int NUMBER_OF_SUFFIXES = 200;
     private static final int NUMBER_OF_THEMES = 20_000;
     private static final int NUMBER_OF_PREFIXES = 10;
     
-    private static final int NUMBER_OF_RANDOM_WORDS = 50_000;
+    private static final int NUMBER_OF_RANDOM_WORDS = 300_000;
     private static final int NUMBER_OF_WORDS = 10_000_000;
     
     private static final boolean REVERSE = false;
@@ -68,11 +69,12 @@ public class LinkedListTreeFactoryTest {
     /**
      * Test of getInstance method, of class LinkedListTreeFactory.
      */
-    @Test
+    //@Test
     public void testCompressSimpleExamples() {
         LoggerService.setLogLevelForConsole(Level.FINER);
         List<String> examples = Arrays.asList(EXAMPLES);
-        testExamples(examples);
+        testExamples(examples, false);
+        testExamples(examples, true);
     }
     
     /**
@@ -82,14 +84,14 @@ public class LinkedListTreeFactoryTest {
     public void testCompressRandomExamples() {
         LoggerService.setLogLevelForConsole(Level.FINER);
         List<String> examples = generateExamples();
-        testExamples(examples);
+        testExamples(examples, false);
     }
     
     
     /**
      * Test of getInstance method, of class LinkedListTreeFactory.
      */
-    @Test
+    //@Test
     public void testCompress3() {
         LoggerService.setLogLevelForConsole(Level.FINER);
         
@@ -102,17 +104,19 @@ public class LinkedListTreeFactoryTest {
             fail(ex.getMessage());
         }
         String resourcePath = folder.getAbsolutePath() + File.separator;
-        
-        //String path = "c:/projekty/neurpheus/neurpheus-utils/data/full_pl_PL.all";
-        //String path = "c:/projekty/neurpheus/neurpheus-utils/data/en_GB.all";
-        //String path = "c:/projekty/neurpheus/neurpheus-utils/data/data-sets/weiss/wikipedia.txt";
-        //String path = "c:/projekty/neurpheus/neurpheus-utils/data/data-sets/weiss/polish.txt";
-        
+
         String path = resourcePath + "english.txt";
+        
+        //path = "c:/projekty/neurpheus/neurpheus-utils/data/full_pl_PL.all";
+        //path = "c:/projekty/neurpheus/neurpheus-utils/data/en_GB.all";
+        //path = "c:/projekty/neurpheus/neurpheus-utils/data/data-sets/weiss/wikipedia.txt";
+        //path = "c:/projekty/neurpheus/neurpheus-utils/data/data-sets/weiss/polish.txt";
+        //path = "c:/projekty/neurpheus/neurpheus-utils/data/data-sets/weiss/random.txt";
+        
          
 
         try {
-            String result = LinkedListTreeTools.testTreeCreation(path, REVERSE);
+            String result = LinkedListTreeTools.testTreeCreation(path, REVERSE, true);
             if (result != null) {
                 fail(result);
             }
@@ -124,12 +128,12 @@ public class LinkedListTreeFactoryTest {
     }
     
     
-    private void testExamples(List<String> examples) {
+    private void testExamples(List<String> examples, boolean parallelMode) {
         System.out.println("--------------------------------------------");
         System.out.printf("Test %d words%n", examples.size());
         System.out.println("--------------------------------------------");
         Tree baseTree = LinkedListTreeTools.createBaseTree(examples, REVERSE);
-        Tree compressedTree = LinkedListTreeFactory.getInstance().createTree(baseTree, true, true);
+        Tree compressedTree = LinkedListTreeFactory.getInstance().createTree(baseTree, true, true, parallelMode);
         
         for (String example : examples) {
             TreeNode node = LinkedListTreeTools.findNode(example, compressedTree, REVERSE);

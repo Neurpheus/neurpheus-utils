@@ -19,14 +19,17 @@ package org.neurpheus.collections.tree.linkedlist;
 import org.neurpheus.collections.array.CompactArray;
 import org.neurpheus.logging.LoggerService;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.neurpheus.collections.tree.TreeNode;
 
 /**
  * Compresses linked list tree using the LZ-based compression algorithm.
@@ -61,7 +64,7 @@ import org.neurpheus.collections.tree.TreeNode;
  */
 public class LZTrieCompression {
 
-    /** Holds the logger for this class */
+    /** Holds the logger for this class. */
     private static final Logger LOGGER = LoggerService.getLogger(LZTrieCompression.class);
 
     /**
@@ -75,9 +78,15 @@ public class LZTrieCompression {
      * compression, if a unit structure should be packed more.
      * </p>
      */
-    private int maxReplacementLength = 127;
-    
+    private static int maxReplacementLength = 127;
+
     public int maxPartitionSize = Integer.MAX_VALUE;
+
+    private static int defaultDivideAndRuleTreshold = 10_000000;
+    //private static int defaultDivideAndRuleTreshold = 100_000_000;
+
+    // page should be greater then maxReplacementLength
+    private static int SYNCHRONIZATION_PAGE_SIZE = maxReplacementLength * 5;
 
     private int[] suffixArray;
     private LinkedListTreeUnitArray units;
@@ -85,14 +94,33 @@ public class LZTrieCompression {
     private LinkedListTreeUnitArray work;
     private boolean[] isWorkNull;
     private int[] nextNotNull;
-    private int[] lPointers;
-    private BitSet aPointers;
-    private BitSet aPointersEnds;
+    private int[] localPointers;
+    private BitSet absolutePointers;
+    private BitSet absolutePointersEnds;
     private int sizeBefore;
     private int unitsLength;
 
-    /** Creates a new instance of LZTrieCompression */
+    private LinkedListTree processedTree;
+
+    int maxSuffixArrayPos;
+    //int partitionEnd;
+    long startTime;
+    long lastTime;
+    int progress;
+    long maxProgress;
+    boolean[] processed;
+    boolean parallel;
+
+    AtomicLong[] synchroniationPages;
+
+    /** Creates a new instance of LZTrieCompression. */
     private LZTrieCompression() {
+    }
+
+    private LZTrieCompression(LinkedListTree tree, boolean parallelMode) {
+        this.processedTree = tree;
+        this.parallel = parallelMode;
+
     }
 
     /**
@@ -102,200 +130,12 @@ public class LZTrieCompression {
      *
      * @return The compression ratio as a percentage size of the source tree.
      */
-    public static double compress(final LinkedListTree tree) {
-        LZTrieCompression compr = new LZTrieCompression();
-        double result = compr.doCompress(tree);
-        compr.updateTwoWayPointers(tree);
+    public static LinkedListTree compress(final LinkedListTree tree, boolean parallelMode) {
+        LZTrieCompression compr = new LZTrieCompression(tree, parallelMode);
+        compr.lztrieCompression();
+        LinkedListTree result = compr.processedTree;
         compr.clear();
         return result;
-    }
-    
-
-    /**
-     * @return the maxReplacementLength
-     */
-    public final int getMaxReplacementLength() {
-        return maxReplacementLength;
-    }
-
-    /**
-     * @param maxReplacementLength the maxReplacementLength to set
-     */
-    public void setMaxReplacementLength(int maxReplacementLength) {
-        this.maxReplacementLength = maxReplacementLength;
-    }
-
-    /**
-     * Represents a comparator used for a suffix array sorting.
-     */
-    private class SuffixArrayComparator implements Comparator {
-
-        /** Holds unis pointed by items in a suffix array. */
-        private LinkedListTreeUnitArray unitsArray;
-
-        /** Holds the maximum index in a units array. */
-        private int maxPos;
-
-        /**
-         * If <code>true</code> substrings should be compared also according to their positions in a
-         * units array.
-         */
-        private boolean comparePositions;
-
-        /**
-         * Constructs new comparator.
-         *
-         * @param units   The array of units constructing a linked list tree.
-         * @param compPos If <code>true</code> substrings should becomparaed also according to their
-         *                positions in a units array.
-         */
-        public SuffixArrayComparator(
-                final LinkedListTreeUnitArray units,
-                final boolean compPos) {
-            this.unitsArray = units;
-            this.maxPos = units.size() - 1;
-            this.comparePositions = compPos;
-        }
-
-        /**
-         * Compares two substrings in a units aray pointed by two items from a suffix array.
-         *
-         * @param objA The position of first substring.
-         * @param objB The position of second substring.
-         *
-         * @return a negative integer, zero, or a positive integer as the first argument is less
-         *         than, equal to, or greater than the second.
-         */
-        @Override
-        public int compare(Object objA, Object objB) {
-            int posA = ((Integer) objA).intValue();
-            int posB = ((Integer) objB).intValue();
-            return compare(posA, posB);
-        }
-                
-        /**
-         * Compares two substrings in a units aray pointed by two items from a suffix array.
-         *
-         * @param objA The position of first substring.
-         * @param objB The position of second substring.
-         *
-         * @return a negative integer, zero, or a positive integer as the first argument is less
-         *         than, equal to, or greater than the second.
-         */
-        public int compare(int posA, int posB) {
-            if (posA >= maxPos) {
-                // Last unit goes to the end
-                return 1;
-            } else if (posB >= maxPos) {
-                // Last unit goes to the end
-                return -1;
-            } else {
-                // Compare two units pointed by the suffix array items.
-                //int res = unitsArray.get(posA).compareTo(unitsArray.get(posB));
-                int res = unitsArray.compareUnits(posA, posB);
-
-                if (res == 0) {
-                    // Substrings are equals at the first position.
-                    // Compare units at the second position.
-                    //res = unitsArray.get(posA + 1).compareTo(unitsArray.get(posB + 1));
-                    res = unitsArray.compareUnits(posA + 1, posB + 1);
-                    
-//                    if ((res == 0) && comparePositions && (posA + 2 <= maxPos) && (posB + 2 <= maxPos)) {
-//                        res = unitsArray.compareUnits(posA + 2, posB + 2);
-//                    }
-                    
-                    // If units are equal and the comparePosition flag is on,
-                    // compare positions of units, otherwise return the result
-                    // of comparision of units at second position.
-                    return (res != 0) || (!comparePositions)
-                            ? res : (posA < posB ? -1 : 1);
-                } else {
-                    // substrings differs at the first position
-                    return res;
-                }
-            }
-        }
-
-        /**
-         * Relases resources consumed by this comparator.
-         */
-        public void clear() {
-            this.unitsArray = null;
-        }
-    }
-    
-    /**
-     * Returns the length of a substring at position j with may be replaced by a substring at
-     * position i.
-     *
-     * @param iPos The position of a substring which is replacement.
-     * @param jPos The position of a substring which should be replaced.
-     *
-     * @return The number of units which can be repleaced.
-     */
-    private int getReplacementLengthOld(int iPos, int jPos) {
-        int res = 0;
-        int i = iPos;
-        int j = jPos;
-        boolean matched;
-        LinkedListTreeUnitArray localWork = work;
-        int maxRes = getMaxReplacementLength();
-        do {
-            
-            // move j to not null position
-            while (j < unitsLength && isWorkNull[j]) {
-                //++j;
-                j += nextNotNull[j];
-            }
-            
-            // move i to not null position
-            while (i < j && i < jPos && i < unitsLength && isWorkNull[i]) {
-                //++i;
-                i += nextNotNull[i];
-            }
-            /*
-             * RULE 0: the length of a replacement is limited because the length is coded on a
-             * limited number of bits; RULE 1: prevent substrings overlaping
-             */
-            matched = i < j && j < unitsLength && res < maxRes && i < jPos && localWork.equalsUnits(i, j);
-            if (matched) {
-                ++i;
-                ++j;
-                ++res;
-            }
-        } while (matched);
-
-        // checks RULE 2, 3 and 4
-        res = 0;
-        if (j > jPos + 1) {
-            boolean aPointerEnd = false;
-            for (int x = jPos; x < j && !aPointerEnd; x++) {
-                if (!isWorkNull[x]) {
-                    // checks RULE 2: no l-pointers pointing after the first unit behind the
-                    //                replaced substring. Note that j variable holds the position
-                    //                of a first unit after the substring.
-                    if (!localWork.isAbsolutePointer(x) && (x + localWork.getDistance(x) > j)) {
-                        j = x;
-                    } 
-                    // checks RULE 3: no l-pointers pointing into the replaced substring
-                    //                from outside of this subtring. Only first unit 
-                    //                in the substring can be pointed from outside unit.
-                    else if (x > jPos && (aPointers.get(x)
-                            || (x < lPointers.length && lPointers[x] > 0 && lPointers[x] < jPos))) {
-                        j = x;
-                        // checks RULE 4:  the substring with is a part of a replacement for other sbstrings cannot be replaced 
-                        //                 if a new replacement contains characters which occurrs after the substring 
-                    } else if (aPointerEnd) {
-                        j = x;
-                    } else {
-                        ++res;
-                    }
-                    aPointerEnd = aPointersEnds.get(x);
-                }
-            }
-        }
-
-        return res;
     }
 
     /**
@@ -313,16 +153,16 @@ public class LZTrieCompression {
         int j = jPos;
         boolean matched;
         LinkedListTreeUnitArray localWork = work;
-        int maxRes = getMaxReplacementLength();
+        int maxRes = maxReplacementLength;
         boolean aPointerEnd = false;
         do {
-            
+
             // move j to not null position
             while (j < unitsLength && isWorkNull[j]) {
                 //++j;
                 j += nextNotNull[j];
             }
-            
+
             // move i to not null position
             while (i < j && i < jPos && i < unitsLength && isWorkNull[i]) {
                 //++i;
@@ -330,28 +170,24 @@ public class LZTrieCompression {
             }
             /*
              */
-            matched = 
-                    // checks RULE 4:  the substring with is a part of a replacement for other sbstrings cannot be replaced 
+            matched
+                    = // checks RULE 4:  the substring with is a part of a replacement for other sbstrings cannot be replaced 
                     //                 if a new replacement contains characters which occurrs after the substring 
                     !aPointerEnd
-
                     // RULE 0: the length of a replacement is limited because the length is coded on a
                     // limited number of bits; RULE 1: prevent substrings overlaping
-                    && res < maxRes 
-                    
-                    // general conditions - unita equals
-                    && i < j && i < jPos && j < unitsLength 
+                    && res < maxRes
+                    // general conditions - units equals
+                    && i < j && i < jPos && j < unitsLength
                     && localWork.equalsUnits(i, j)
-                    
-                    
                     // checks RULE 3: no l-pointers pointing into the replaced substring
                     //                from outside of this subtring. Only first unit 
                     //                in the substring can be pointed from outside unit.
-                    && (j == jPos || (!aPointers.get(j) && (lPointers[j] == 0 || lPointers[j] >= jPos)));
-                    ;
+                    && (j == jPos || (!absolutePointers.get(j) && (localPointers[j] == 0 || localPointers[j] >= jPos)));
+            ;
             if (matched) {
                 ++res;
-                aPointerEnd = aPointersEnds.get(j);
+                aPointerEnd = absolutePointersEnds.get(j);
                 i += nextNotNull[i];
                 j += nextNotNull[j];
             }
@@ -376,23 +212,7 @@ public class LZTrieCompression {
 
         return res;
     }
-    
-    /**
-     * Compares two substrings in a units aray pointed by two items from a suffix array.
-     *
-     * @param objA The position of first substring.
-     * @param objB The position of second substring.
-     *
-     * @return a negative integer, zero, or a positive integer as the first argument is less
-     *         than, equal to, or greater than the second.
-     */
-    public boolean inPacket(int posA, int posB) {
-        if (units.equalsUnits(posA, posB)) {
-            return units.equalsUnits(posA + 1, posB +1);
-        }
-        return false;
-    }
-    
+
     /**
      *
      * @param pos
@@ -430,8 +250,8 @@ public class LZTrieCompression {
                         stop = false;
                     }
                 }
-                ++curPos;
             }
+            ++curPos;
         } while (!stop);
         return numberOfUnits;
     }
@@ -464,33 +284,20 @@ public class LZTrieCompression {
                 lastUnitPos = i;
             }
         }
-        aPointersEnds.set(lastUnitPos, true);
+        absolutePointersEnds.set(lastUnitPos, true);
         return numberOfUnits;
     }
 
-    /**
-     *
-     * @param tree
-     *
-     * @return
-     */
-    private double doCompress(final LinkedListTree tree) {
-        sizeBefore = tree.getUnitArray().size();
-
-        LOGGER.info("LZTrie compression started");
-        
-        units = tree.getUnitArray();
-        unitsLength = units.size();
-
+    private void createSortedSuffixArray() {
         // create suffx array
-        LOGGER.fine("    creating suffix array....");
+        LOGGER.finer("    creating suffix array....");
         Integer[] tmpArray = new Integer[unitsLength];
         for (int i = tmpArray.length - 1; i >= 0; i--) {
             tmpArray[i] = i;
         }
 
         // sort suffix array
-        LOGGER.fine("    sorting suffix array...");
+        LOGGER.finer("    sorting suffix array...");
         comparator = new SuffixArrayComparator(units, true);
         Arrays.sort(tmpArray, comparator);
         suffixArray = new int[unitsLength];
@@ -499,130 +306,275 @@ public class LZTrieCompression {
         }
 
         tmpArray = null;
-        
+        maxSuffixArrayPos = suffixArray.length - 1;
+    }
+
+    private void createBackPointersArray() {
         // create back pointers array
-        LOGGER.fine("   creating back pointer arrays...");
-        lPointers = new int[unitsLength];
-        aPointers = new BitSet(unitsLength);
-        aPointersEnds = new BitSet(unitsLength);
+        LOGGER.finer("   creating back pointer arrays...");
+        localPointers = new int[unitsLength];
+        absolutePointers = new BitSet(unitsLength);
+        absolutePointersEnds = new BitSet(unitsLength);
         for (int i = 0; i < unitsLength; i++) {
             //LinkedListTreeUnit unit = units.get(i);
             if (units.getDistance(i) > 0) {
                 if (units.isAbsolutePointer(i)) {
-                    aPointers.set(units.getDistance(i), true);
+                    absolutePointers.set(units.getDistance(i), true);
                     if (units.getValueCode(i) > 0) {
-                        aPointersEnds.set(units.getDistance(i) + units.getValueCode(1) - 1, true);
+                        absolutePointersEnds.set(units.getDistance(i) + units.getValueCode(1) - 1,
+                                                 true);
                     }
                 } else {
-                    lPointers[i + units.getDistance(i)] = i;
+                    localPointers[i + units.getDistance(i)] = i;
                 }
             }
         }
+    }
+
+    private void createTemporaryResultArray() {
 
         // create temporary result array
-        LOGGER.fine("   creating temorary result array...");
+        LOGGER.finer("   creating temorary result array...");
         //work = new FastLinkedListTreeUnitArray(units);
-        work = units;
-        units = new CompactLinkedListTreeUnitArray(units);
-        tree.setUnitArray(units);
-        units.logStatistics("compact form");
-        
+        if (units instanceof CompactLinkedListTreeUnitArray) {
+            work = new FastLinkedListTreeUnitArray(units);
+        } else {
+            work = units;
+            units = new CompactLinkedListTreeUnitArray(units);
+        }
+        processedTree.setUnitArray(units);
+    }
+
+    /**
+     *
+     * @param tree
+     *
+     * @return
+     */
+    private double lztrieCompression() {
+        LOGGER.fine("LZTrie compression started");
+        sizeBefore = processedTree.getUnitArray().size();
+
+        units = processedTree.getUnitArray();
+        unitsLength = units.size();
+
+        createSortedSuffixArray();
+        createBackPointersArray();
+        createTemporaryResultArray();
+
+        prepareLoop();
+
+        if (parallel) {
+            mainLoopParallel();
+        } else {
+            mainLoopFirst();
+        }
+
+        eliminateEmptySpace();
+        updateTwoWayPointers();
+
+        LOGGER.info("LZTrie compression finished");
+
+        final int sizeAfter = processedTree.getUnitArray().size();
+        return sizeBefore == 0 ? 100.0 : 100.0 * sizeAfter / sizeBefore;
+    }
+
+    protected void prepareLoop() {
         // Analyses units from the begining to the end of a suffix array and
         // replaces each repeted substring with the substring at the current
         // analysed position.
         comparator = new SuffixArrayComparator(units, false);
-        final int maxSuffixArrayPos = suffixArray.length - 1;
-        int partitionEnd = -1;
-        long startTime = System.currentTimeMillis();
-        long lastTime = startTime;
-        int progress = 1;
-        long maxProgress = maxSuffixArrayPos;
-        boolean[] processed = new boolean[maxSuffixArrayPos + 1];
+        processed = new boolean[maxSuffixArrayPos + 1];
         isWorkNull = new boolean[maxSuffixArrayPos + 1];
         nextNotNull = new int[maxSuffixArrayPos + 1];
+        synchroniationPages = new AtomicLong[2 + ((maxSuffixArrayPos + 1) / SYNCHRONIZATION_PAGE_SIZE)];
+        for (int i = 0; i < synchroniationPages.length; i++) {
+            synchroniationPages[i] = new AtomicLong(1L);
+        }
         Arrays.fill(nextNotNull, 1);
-        
-        
-        LOGGER.fine("   searching for duplicated tree fragments...");
-        for (int i = 1; i < maxSuffixArrayPos; i++) {
-            if (LOGGER.isLoggable(Level.FINER)) {
-                long duration = System.currentTimeMillis() - lastTime;
-                if (duration > 1_000) {
-                    float percent = 100.0f * progress / maxProgress;
-                    float speed = progress / (System.currentTimeMillis() - startTime);
-                    long toTheEnd = (long) ( (maxProgress - progress) / speed);
 
-                    LOGGER.finer(String.format("    searching for duplicated tree fragments : %7.4f %%", percent));
-                    lastTime = System.currentTimeMillis();
-                    LOGGER.finer(String.format("Estimated finish in %d s. (about %tT)", toTheEnd /1000, new Date(lastTime + toTheEnd)));
-                }
-            }
+        initializeProgressMonitoring();
+
+    }
+
+    protected void mainLoopSecond() {
+        LOGGER.finer("   searching for duplicated tree fragments...");
+        // search partitions
+        List<Integer> partitionPoints = findPartitions();
+        int partitionStart = 0;
+        for (int partitionPoint : partitionPoints) {
+            processPartition(partitionStart, partitionPoint);
+            partitionStart = partitionPoint;
+        }
+        LOGGER.finer(
+                "    searching for duplicated tree fragments: 100%. Preparing final LZTrie data.");
+    }
+
+    protected void mainLoopParallel() {
+        LOGGER.finer("   searching for duplicated tree fragments...");
+        int cores = Math.max(1, Runtime.getRuntime().availableProcessors() - 1);
+        ThreadPoolExecutor pool = (ThreadPoolExecutor) Executors.newFixedThreadPool(cores);
+        List<Integer> partitionPoints = findPartitions();
+        List<Callable<Integer>> tasks = new ArrayList<>(partitionPoints.size());
+        int partitionStart = 0;
+        for (int partitionPoint : partitionPoints) {
+            tasks.add(new PartitionCompression(this, partitionStart, partitionPoint));
+            partitionStart = partitionPoint;
+        }
+        try {
+            pool.invokeAll(tasks);
+        } catch (InterruptedException ex) {
+            Logger.getLogger(LZTrieCompression.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        pool.shutdown();
+        LOGGER.finer(
+                "    searching for duplicated tree fragments: 100%. Preparing final LZTrie data.");
+    }
+
+    protected void processPartition(int partitionStart, int partitionEnd) {
+        for (int i = partitionStart; i < partitionEnd; i++) {
+            logProgress();
             final int iPos = suffixArray[i];
             processed[iPos] = true;
-            //if (!work.isNull(iPos)) {
             if (!isWorkNull[iPos]) {
                 progress++;
-                // determine the end of a partition
+                findDuplicates(i, iPos, partitionEnd);
+            }
+        }
+    }
+
+    protected List<Integer> findPartitions() {
+        List<Integer> partitionPoints = new ArrayList<>();
+        for (int i = 0; i < maxSuffixArrayPos;) {
+            int iPos = suffixArray[i];
+            int partitionEnd = i + 1;
+            int posB = suffixArray[partitionEnd];
+            while ((partitionEnd < maxSuffixArrayPos)
+                    && ((partitionEnd - i) < maxPartitionSize)
+                    && units.equalsUnits(iPos, posB)
+                    && units.equalsUnits(iPos + 1, posB + 1)) {
+                ++partitionEnd;
+                posB = suffixArray[partitionEnd];
+            }
+            i = partitionEnd;
+            partitionPoints.add(partitionEnd);
+        }
+        return partitionPoints;
+    }
+
+    protected void mainLoopFirst() {
+        LOGGER.finer("   searching for duplicated tree fragments...");
+        int partitionEnd = -1;
+        for (int i = 1; i < maxSuffixArrayPos; i++) {
+            logProgress();
+            final int iPos = suffixArray[i];
+            processed[iPos] = true;
+            if (!isWorkNull[iPos]) {
+                progress++;
                 if (partitionEnd <= i) {
-                    partitionEnd = i + 1;
-                    int partitionSize = 0;
-                    int posB = suffixArray[partitionEnd];
-                    while ((partitionEnd < maxSuffixArrayPos) 
-                            && ((partitionEnd - i) < maxPartitionSize) 
-                            && units.equalsUnits(iPos, posB) 
-                            && units.equalsUnits(iPos + 1, posB + 1)) 
-                    {
-                        ++partitionEnd;
-                        partitionSize++;
-                        posB = suffixArray[partitionEnd];
-                    }
-//                    if (partitionSize > 5000) {
-//                        LOGGER.info("*** BIG PARTITION : " + partitionSize);
-//                        LOGGER.info(units.get(iPos).toString());
-//                        LOGGER.info(units.get(iPos+1).toString());
-//                        LOGGER.info("*******************************************");
-//                    }
+                    partitionEnd = findPartitionEnd(i, iPos);
                 }
-                for (int j = i + 1; j < partitionEnd; j++) {
-                    final int jPos = suffixArray[j];
-                    if (!isWorkNull[jPos]) {
-                        int replacementLength = getReplacementLength(iPos, jPos);
-                        if (replacementLength > 1) {
-                            // determines number of units available on the target position
-                            // returns 0 if replacement is closed and this number is not
-                            // important
-                            final int nofu = getNumberOfUnits(iPos, replacementLength);
-                            // check if replacement is open or closed
-                            aPointers.set(iPos, true);
-                            work.set(jPos, iPos, false, false, nofu, 0);
-                            isWorkNull[jPos] = false;
-                            //aPointersEnds[iPos.intValue() + replacementLength - 1] = true;                                
-                            --replacementLength;
-                            boolean isReplacementEnd = false;
-                            for (int k = 1; replacementLength > 0; k++) { // NOSONAR
-                                if (!isWorkNull[jPos + k]) {
-                                    if (!processed[jPos+k]){
-                                        progress++;
-                                    }
-                                    isReplacementEnd = aPointersEnds.get(jPos + k);
-                                    work.set(jPos + k, null);
-                                    isWorkNull[jPos + k] = true;
-                                    --replacementLength;
-                                }
-                            }
-                            updateNotNullDistance(jPos);
-                            if (isReplacementEnd) {
-                                aPointersEnds.set(jPos, true);
+                findDuplicates(i, iPos, partitionEnd);
+            }
+        }
+        LOGGER.finer(
+                "    searching for duplicated tree fragments: 100%. Preparing final LZTrie data.");
+    }
+
+    protected int findPartitionEnd(final int i, final int iPos) {
+        int partitionEnd = i + 1;
+        int partitionSize = 0;
+        int posB = suffixArray[partitionEnd];
+        while ((partitionEnd < maxSuffixArrayPos)
+                && ((partitionEnd - i) < maxPartitionSize)
+                && units.equalsUnits(iPos, posB)
+                && units.equalsUnits(iPos + 1, posB + 1)) {
+            ++partitionEnd;
+            partitionSize++;
+            posB = suffixArray[partitionEnd];
+        }
+        return partitionEnd;
+    }
+
+    protected void findDuplicates(final int i, final int iPos, final int partitionEnd) {
+        for (int j = i + 1; j < partitionEnd; j++) {
+            final int jPos = suffixArray[j];
+            if (!isWorkNull[jPos]) {
+                int replacementLength = getReplacementLength(iPos, jPos);
+                if (replacementLength > 1) {
+                    int page = jPos / SYNCHRONIZATION_PAGE_SIZE;
+                    AtomicLong syncObj1 = synchroniationPages[page];
+                    AtomicLong syncObj2 = synchroniationPages[page + 1];
+                    if (((jPos + replacementLength) / SYNCHRONIZATION_PAGE_SIZE) > page + 1) {
+                        throw new IllegalStateException("Unsycnhronized page hit");
+                    }
+                    synchronized (syncObj1) {
+                        synchronized (syncObj2) {
+                            int replacementLength2 = getReplacementLength(iPos, jPos);
+                            if (replacementLength2 > 1) {
+                                replaceDuplicate(iPos, jPos, replacementLength2);
                             }
                         }
                     }
                 }
             }
         }
-        if (LOGGER.isLoggable(Level.FINE)) {
-            LOGGER.fine("    searching for duplicated tree fragments: 100%. Preparing final LZTrie data.");
-        }
+    }
 
+    protected void replaceDuplicate(int iPos, int jPos, int replacementLength) {
+        // determines number of units available on the target position
+        // returns 0 if replacement is closed and this number is not
+        // important
+        final int nofu = getNumberOfUnits(iPos, replacementLength);
+        // check if replacement is open or closed
+        absolutePointers.set(iPos, true);
+        work.set(jPos, iPos, false, false, nofu, 0);
+        isWorkNull[jPos] = false;
+        //aPointersEnds[iPos.intValue() + replacementLength - 1] = true;                                
+        --replacementLength;
+        boolean isReplacementEnd = false;
+        for (int k = 1; replacementLength > 0; k++) { // NOSONAR
+            if (!isWorkNull[jPos + k]) {
+                if (!processed[jPos + k]) {
+                    progress++;
+                }
+                isReplacementEnd = absolutePointersEnds.get(jPos + k);
+                work.set(jPos + k, null);
+                isWorkNull[jPos + k] = true;
+                --replacementLength;
+            }
+        }
+        updateNotNullDistance(jPos);
+        if (isReplacementEnd) {
+            absolutePointersEnds.set(jPos, true);
+        }
+    }
+
+    protected synchronized void logProgress() {
+        if (LOGGER.isLoggable(Level.FINER)) {
+            long duration = System.currentTimeMillis() - lastTime;
+            if (duration > 1_000) {
+                float percent = 100.0f * progress / maxProgress;
+                float speed = progress / (System.currentTimeMillis() - startTime);
+                long toTheEnd = (long) ((maxProgress - progress) / speed);
+
+                LOGGER.finer(String.format("    searching for duplicated tree fragments : %7.4f %%",
+                                           percent));
+                lastTime = System.currentTimeMillis();
+                LOGGER.finer(String.format("Estimated finish in %d s. (about %tT)", toTheEnd / 1000,
+                                           new Date(lastTime + toTheEnd)));
+            }
+        }
+    }
+
+    protected void initializeProgressMonitoring() {
+        startTime = System.currentTimeMillis();
+        lastTime = startTime;
+        progress = 1;
+        maxProgress = maxSuffixArrayPos;
+    }
+
+    protected void eliminateEmptySpace() {
         // removes empty elements and upgrades pointers
         LOGGER.fine("   removing empty elements and update pointers....");
         CompactArray emptyElementCounters = new CompactArray(work.size(), 15);
@@ -633,15 +585,16 @@ public class LZTrieCompression {
                 ++counter;
             }
         }
-        
-        tree.getUnitArray().dispose();
-        tree.setUnitArray(work);
-        
+
+        processedTree.getUnitArray().dispose();
+        processedTree.setUnitArray(work);
+
         FastLinkedListTreeUnitArray result = new FastLinkedListTreeUnitArray(work.size() - counter);
-        result.setValueMapping(work.getValueMapping());
+        result.valueMapping = work.getValueMapping();
+        result.reverseMapping = work.getReverseValueMapping();
         int pos = 0;
         for (int i = 0; i < work.size(); i++) {
-            if (!isWorkNull[i]) {            
+            if (!isWorkNull[i]) {
                 final LinkedListTreeUnit unit = work.get(i);
                 if (unit.isAbsolutePointer()) {
                     unit.setDistance(unit.getDistance() - emptyElementCounters.getIntValue(unit.
@@ -655,23 +608,15 @@ public class LZTrieCompression {
         }
         work.dispose();
         work = null;
-        
-        tree.setUnitArray(result);
 
-        
-        //making compact array
-        //tree.getUnitArray().compact();
-        
-        LOGGER.info("LZTrie compression finished");
+        processedTree.setUnitArray(result);
 
-        final int sizeAfter = tree.getUnitArray().size();
-        return sizeBefore == 0 ? 100.0 : 100.0 * sizeAfter / sizeBefore;
     }
 
-    protected void updateTwoWayPointers(LinkedListTree tree) {
+    protected void updateTwoWayPointers() {
         // update two-way pointers lengths
         LOGGER.fine("   updating two-way pointers lengths....");
-        LinkedListTreeUnitArray tmpUnitArray = tree.getUnitArray();
+        LinkedListTreeUnitArray tmpUnitArray = processedTree.getUnitArray();
         for (int i = tmpUnitArray.size() - 1; i >= 0; i--) {
             final LinkedListTreeUnit unit = tmpUnitArray.get(i);
             if (unit.isAbsolutePointer()) {
@@ -689,7 +634,7 @@ public class LZTrieCompression {
             }
         }
     }
-    
+
     private void updateNotNullDistance(int pos) {
 
         // go forward
@@ -702,7 +647,7 @@ public class LZTrieCompression {
             nextNotNull[i] = distance;
             --distance;
         }
-        
+
         // go back
         distance = 1;
         int prev = pos - 1;
@@ -715,8 +660,7 @@ public class LZTrieCompression {
             --distance;
         }
     }
-    
-    
+
     private void clear() {
         suffixArray = null;
         units = null;
@@ -725,10 +669,11 @@ public class LZTrieCompression {
         }
         comparator = null;
         work = null;
-        lPointers = null;
-        aPointers = null;
-        aPointersEnds = null;
+        localPointers = null;
+        absolutePointers = null;
+        absolutePointersEnds = null;
         isWorkNull = null;
+        synchroniationPages = null;
     }
 
 }

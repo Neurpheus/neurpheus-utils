@@ -63,7 +63,7 @@ public class LinkedListTreeFactory implements TreeFactory {
         return new LinkedListTree();
     }
 
-    public Tree createTree(Tree baseTree, boolean clearBaseTree, boolean compress) {
+    public Tree createTree(Tree baseTree, boolean clearBaseTree, boolean compress, boolean parallelMode) {
         long startTime = System.currentTimeMillis();
         LinkedListTree llt = createLinkedListTree(baseTree, clearBaseTree);
         
@@ -74,11 +74,12 @@ public class LinkedListTreeFactory implements TreeFactory {
         long memoryBefore = llt.getUnitArray().getAllocationSize();
         
         if (compress) {
-            double ratio = LZTrieCompression.compress(llt);
-            llt.getUnitArray().logStatistics("compressed form");
-            if (LOGGER.isLoggable(Level.FINE)) {
-                LOGGER.fine("LZTrie compression ratio : " + ratio);
-            }
+            llt = LZTrieCompression.compress(llt, parallelMode);
+            
+//            llt.getUnitArray().logStatistics("compressed form");
+//            if (LOGGER.isLoggable(Level.FINE)) {
+//                LOGGER.fine("LZTrie compression ratio : " + ratio);
+//            }
         }
         
 
@@ -90,9 +91,10 @@ public class LinkedListTreeFactory implements TreeFactory {
 //                LOGGER.fine("LZTrie compression ratio : " + ratio);
 //            }
 //        }
-        compact(llt);
 
         
+
+        compact(llt);
         
         
         long memoryAfter = llt.getUnitArray().getAllocationSize();
