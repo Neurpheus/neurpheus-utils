@@ -24,6 +24,10 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Logger;
+import org.neurpheus.logging.LoggerService;
 
 /**
  * LZTrie implementation of tree.
@@ -32,6 +36,8 @@ import java.io.Serializable;
  */
 public class LinkedListTree implements Tree, Serializable {
 
+    private static final Logger LOGGER = LoggerService.getLogger(LinkedListTree.class);
+    
     /** Unique serialization identifier of this class. */
     static final long serialVersionUID = 770608151111104412L;
 
@@ -40,6 +46,10 @@ public class LinkedListTree implements Tree, Serializable {
     protected LinkedListTreeUnitArray unitArray;
     
     public LinkedListTree() {
+        unitArray = new FastLinkedListTreeUnitArray(1);
+        LinkedListTreeUnit rootUnit = new LinkedListTreeUnit();
+        rootUnit.setWordContinued(true);
+        unitArray.add(rootUnit);
     }
 
     /**
@@ -100,6 +110,49 @@ public class LinkedListTree implements Tree, Serializable {
         LinkedListTree result = new LinkedListTree();
         result.read(in);
         return result;
+    }
+
+    public List<LinkedListTree> split() {
+        LinkedListTreeFactory factory = LinkedListTreeFactory.getInstance();
+        LinkedListTreeNode root = new LinkedListTreeNode(new LinkedListPosition(unitArray, 0, null, 0, false));
+        List<LinkedListTreeNode> children = root.getChildren();
+        LOGGER.fine("Split tree into " + children.size() + " sub trees");
+        List<LinkedListTree> result = new ArrayList<>(children.size());
+        for (LinkedListTreeNode childNode : children) {
+            LinkedListPosition childPos = childNode.getPosition();
+            int startIndex = childPos.getPos();
+            int offset = childPos.getDistance();
+            int endIndex = offset == 0 ? unitArray.size() : startIndex + offset;
+            LinkedListTreeUnitArray subArray = unitArray.subArray(startIndex, endIndex);
+            LinkedListTreeUnit unit = subArray.get(0);
+            unit.setDistance(0);
+            subArray.set(0, unit);
+            subArray.moveAbsolutePointers(-startIndex);
+            subArray = new CompactLinkedListTreeUnitArray(subArray);
+            LinkedListTree childTree = (LinkedListTree) factory.createTree();
+            childTree.setUnitArray(subArray);
+            result.add(childTree);
+        }
+        return result;
+    }
+
+    void joinSubTrees(List<LinkedListTree> forest) {
+        LinkedListTreeUnitArray unitArray = getUnitArray();
+        int lastChildPos = 0;
+        for (LinkedListTree subTree : forest) {
+            lastChildPos = unitArray.size();
+            LinkedListTreeUnitArray subArray = subTree.getUnitArray();
+            subArray.moveAbsolutePointers(lastChildPos);
+            unitArray.addAll(subArray);
+            LinkedListTreeUnit unit = unitArray.get(lastChildPos);
+            unit.setDistance(subArray.size());
+            unitArray.set(lastChildPos, unit);
+        }
+        if (lastChildPos > 0) {
+            LinkedListTreeUnit unit = unitArray.get(lastChildPos);
+            unit.setDistance(0);
+            unitArray.set(lastChildPos, unit);
+        }
     }
 
 }

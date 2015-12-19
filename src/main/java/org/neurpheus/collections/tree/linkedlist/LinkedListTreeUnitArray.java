@@ -7,6 +7,7 @@ package org.neurpheus.collections.tree.linkedlist;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.Map;
 
 /**
  *
@@ -14,9 +15,13 @@ import java.io.IOException;
  */
 public interface LinkedListTreeUnitArray {
 
-    public void logStatistics(String name);
+    void logStatistics(String name);
 
-    public int getValueCodeFast(int fastp);
+    int getValueCodeFast(int fastp);
+
+    void addAll(LinkedListTreeUnitArray subArray);
+
+    void moveAbsolutePointers(int i);
 
     void add(final LinkedListTreeUnit unit);
 
@@ -84,8 +89,13 @@ public interface LinkedListTreeUnitArray {
     
     int[] getValueMapping();
     
+    Map<Integer, Integer> getReverseValueMapping();
+    
     void setValueMapping(int[] mapping);
 
     public int mapToValueCode(int value);
+    
+    
+    LinkedListTreeUnitArray subArray(int startIndex, int endIndex);
     
 }
