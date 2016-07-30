@@ -64,13 +64,9 @@ public class CompactArray implements Serializable {
      */
     private static final int INDEX_SHIFT = 6;
     
-    /**
-     * Basic allocation for fields : array object reference, size, numberOfButs, 
-     * maxValue, reallocationIncrementation.
-     */
-    private static final int BASIC_ALLOCATION_SIZE = 44;
+    /** Estimated memory occupied by internal objects of this objects. */
+    public static final int BASE_ALLOCATION_SIZE = 24 + 4 + 4 + 8 + 4 + 4;
     
-
     /** The backing array. */
     private long[] data;
 
@@ -263,7 +259,7 @@ public class CompactArray implements Serializable {
         } 
         final long bitIndex = ((long) index) * numberOfBits;
         final int bitpos = (int) (bitIndex & INDEX_MASK);
-        final long usedBits = BITS_PER_ITEM - bitpos;
+        final int usedBits = BITS_PER_ITEM - bitpos;
         int pos = (int) (bitIndex >> INDEX_SHIFT);
         if (pos + 1 >= data.length) {
             expand(pos + 1);
@@ -321,7 +317,7 @@ public class CompactArray implements Serializable {
      * Reduces the size of a backing array to the minimum possible size.
      */
     public void compact() {
-        long bitIndex = (size() - 1) * numberOfBits;
+        long bitIndex = (size() - 1) * (long) numberOfBits;
         int pos = (int) (bitIndex >> INDEX_SHIFT);
         pos++;
         if (pos < data.length - 1) {
@@ -348,7 +344,7 @@ public class CompactArray implements Serializable {
      * @return number of bytes occupied by this object.
      */
     public long getAllocationSize() {
-        long result = BASIC_ALLOCATION_SIZE;
+        long result = BASE_ALLOCATION_SIZE;
         
         if (data != null) {
             result += data.length * 8;

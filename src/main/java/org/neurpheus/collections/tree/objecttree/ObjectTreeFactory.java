@@ -38,22 +38,15 @@ public final class ObjectTreeFactory<T, D> implements TreeFactory<T, D> {
     /**
      * Single instance of this factory.
      */
-    private static final ObjectTreeFactory instance = new ObjectTreeFactory();
+    private static final ObjectTreeFactory INSTANCE = new ObjectTreeFactory();
     
-    /**
-     * Creates a new instance of ObjectTreeFactory.
-     */
-    private ObjectTreeFactory() {
-    }
-
-
     /**
      * Returns a single instance of this factory.
      *
      * @return Factory object.
      */
     public static ObjectTreeFactory getInstance() {
-        return instance;
+        return INSTANCE;
     }
 
     /**
@@ -62,8 +55,8 @@ public final class ObjectTreeFactory<T, D> implements TreeFactory<T, D> {
      * @return A new tree objects.
      */
     @Override
-    public Tree createTree() {
-        return new ObjectTree();
+    public Tree<T, D> createTree() {
+        return new ObjectTree<>();
     }
 
     /**
@@ -74,8 +67,8 @@ public final class ObjectTreeFactory<T, D> implements TreeFactory<T, D> {
      * @return constructed node.
      */
     @Override
-    public ObjectTreeNode createTreeNode(T value) {
-        return new ObjectTreeNode(value);
+    public ObjectTreeNode<T> createTreeNode(T value) {
+        return new ObjectTreeNode<>(value);
     }
 
     /**
@@ -87,8 +80,8 @@ public final class ObjectTreeFactory<T, D> implements TreeFactory<T, D> {
      * @return constructed node.
      */
     @Override
-    public TreeNodeWithData createTreeNodeWithAdditionalData(T value, D data) {
-        return new ObjectTreeNodeWithData(value, data);
+    public TreeNodeWithData<T, D> createTreeNodeWithAdditionalData(T value, D data) {
+        return new ObjectTreeNodeWithData<>(value, data);
     }
 
     /**
@@ -116,8 +109,8 @@ public final class ObjectTreeFactory<T, D> implements TreeFactory<T, D> {
      *
      * @param tree Tree which nodes should be sort.
      */
-    public void sortTree(Tree tree) {
-        ((ObjectTreeNode) tree.getRoot()).sort();
+    public void sortTree(Tree<T, D> tree) {
+        ((ObjectTreeNode<T>) tree.getRoot()).sort();
     }
 
 }

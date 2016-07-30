@@ -1,5 +1,17 @@
 /*
- *  © 2015 Jakub Strychowski
+ * Neurpheus - Utilities Package
+ *
+ * Copyright (C) 2006-2016 Jakub Strychowski
+ *
+ *  This library is free software; you can redistribute it and/or modify it
+ *  under the terms of the GNU Lesser General Public License as published by the Free
+ *  Software Foundation; either version 3.0 of the License, or (at your option)
+ *  any later version.
+ *
+ *  This library is distributed in the hope that it will be useful, but
+ *  WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ *  or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License
+ *  for more details.
  */
 
 package org.neurpheus.collections.array;
@@ -214,6 +226,8 @@ public class CompactArrayTest {
 
     @Test
     public void testAllocation() {
+        CompactArray smallArray = new CompactArray(1, 1);
+        assertEquals(RamUsageEstimator.sizeOf(smallArray), smallArray.getAllocationSize(), 8);
         for (long maxValue = 1; maxValue < Long.MAX_VALUE / 10; maxValue = maxValue << 1) {
             CompactArray instance = new CompactArray();
             long testSize = 50 + Math.round(Math.random() * numberOfElements);
@@ -225,7 +239,7 @@ public class CompactArrayTest {
             instance.compact();
             long allocation = instance.getAllocationSize();
             long sizeOf = RamUsageEstimator.sizeOf(instance);
-            assertEquals(sizeOf, allocation, 40);
+            assertEquals(sizeOf, allocation, 8);
             assertEquals(CompactArray.determineNumberOfBits(maxValue), 
                          8f * (sizeOf - 44) / (testSize + 1), 2);
         }

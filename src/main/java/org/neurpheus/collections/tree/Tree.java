@@ -16,6 +16,8 @@
 
 package org.neurpheus.collections.tree;
 
+import java.io.Serializable;
+
 /**
  * A tree data structure can be defined recursively (locally) as a collection of nodes (starting at
  * a root node), where each node is a data structure consisting of a value, together with a list of
@@ -28,49 +30,52 @@ package org.neurpheus.collections.tree;
  * <p>
  * <h2>Terminologies used in Trees</h2>
  * <ul>
- * <li><strong>Root</strong> – The top node in a tree.</li>
- * <li><strong>Parent</strong> – The converse notion of a child.</li>
- * <li><strong>Siblings</strong> – Nodes with the same parent.</li>
- * <li><strong>Descendant</strong> – a node reachable by repeated proceeding from parent to
+ * <li><strong>Root</strong> - The top node in a tree.</li>
+ * <li><strong>Parent</strong> - The converse notion of a child.</li>
+ * <li><strong>Siblings</strong> - Nodes with the same parent.</li>
+ * <li><strong>Descendant</strong> - a node reachable by repeated proceeding from parent to
  * child.</li>
- * <li><strong>Ancestor</strong> – a node reachable by repeated proceeding from child to
+ * <li><strong>Ancestor</strong> - a node reachable by repeated proceeding from child to
  * parent.</li>
- * <li><strong>Leaf</strong> – a node without child nodes.</li>
- * <li><strong>Internal node</strong> – a node with at least one child.</li>
- * <li><strong>External node</strong> – a node with no children.</li>
- * <li><strong>Degree</strong> – number of sub trees of a node.</li>
- * <li><strong>Edge</strong> – connection between one node to another.</li>
- * <li><strong>Path</strong> – a sequence of nodes and edges connecting a node with a
+ * <li><strong>Leaf</strong> - a node without child nodes.</li>
+ * <li><strong>Internal node</strong> - a node with at least one child.</li>
+ * <li><strong>External node</strong> - a node with no children.</li>
+ * <li><strong>Degree</strong> - number of sub trees of a node.</li>
+ * <li><strong>Edge</strong> - connection between one node to another.</li>
+ * <li><strong>Path</strong> - a sequence of nodes and edges connecting a node with a
  * descendant.</li>
- * <li><strong>Level</strong> – The level of a node is defined by 1 + (the number of connections
+ * <li><strong>Level</strong> - The level of a node is defined by 1 + (the number of connections
  * between the node and the root).</li>
- * <li><strong>Height of tree</strong> –The height of a tree is the number of edges on the longest
+ * <li><strong>Height of tree</strong> -The height of a tree is the number of edges on the longest
  * downward path between the root and a leaf.</li>
- * <li><strong>Height of node</strong> –The height of a node is the number of edges on the longest
+ * <li><strong>Height of node</strong> -The height of a node is the number of edges on the longest
  * downward path between that node and a leaf.</li>
- * <li><strong>Depth</strong> – The depth of a node is the number of edges from the node to the
+ * <li><strong>Depth</strong> - The depth of a node is the number of edges from the node to the
  * tree's root node.</li>
- * <li><strong>Forest</strong> – A forest is a set of n ? 0 disjoint trees.</li>
+ * <li><strong>Forest</strong> - A forest is a set of n ? 0 disjoint trees.</li>
  * </ul>
  * </p>
  *
+ * @param <T> Type of values describing nodes.
+ * @param <D> Type of additional data stored in some nodes.
+ * 
  * @author Jakub Strychowski
  */
-public interface Tree {
+public interface Tree<T, D> extends Serializable {
 
     /**
      * Returns the root node of the tree.
      *
      * @return The root node.
      */
-    TreeNode getRoot();
+    TreeNode<T> getRoot();
 
     /**
      * Sets the root for this tree.
      *
      * @param root New root node.
      */
-    void setRoot(TreeNode root);
+    void setRoot(TreeNode<T> root);
 
     /**
      * Removes all nodes from the tree.
@@ -82,6 +87,6 @@ public interface Tree {
      *
      * @return An implementation of a factory which creates nodes for this tree.
      */
-    TreeFactory getFactory();
+    TreeFactory<T, D> getFactory();
 
 }

@@ -1,25 +1,35 @@
 /*
- *  © 2015 Jakub Strychowski
+ * Neurpheus - Utilities Package
+ *
+ * Copyright (C) 2006-2016 Jakub Strychowski
+ *
+ *  This library is free software; you can redistribute it and/or modify it
+ *  under the terms of the GNU Lesser General Public License as published by the Free
+ *  Software Foundation; either version 3.0 of the License, or (at your option)
+ *  any later version.
+ *
+ *  This library is distributed in the hope that it will be useful, but
+ *  WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ *  or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License
+ *  for more details.
  */
 
 package org.neurpheus.core.date;
 
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Collection;
-import java.util.Date;
-import java.util.Locale;
-import java.util.TimeZone;
+import static org.junit.Assert.assertEquals;
+
 import net.trajano.commons.testing.UtilityClassTestUtil;
-import org.joda.time.DateTime;
 import org.junit.Assert;
 import org.junit.Test;
-import static org.junit.Assert.*;
-import org.junit.runners.Parameterized;
+
+import java.util.Calendar;
+import java.util.Date;
+import java.util.TimeZone;
 
 /**
+ * Test parsing of data and time from string values.
  *
- * @author Kuba
+ * @author Jakub Strychowski
  */
 public class ISO8601ParserTest {
 

@@ -17,7 +17,6 @@
 package org.neurpheus.collections.tree.objecttree;
 
 import org.neurpheus.collections.tree.Tree;
-import org.neurpheus.collections.tree.TreeFactory;
 import org.neurpheus.collections.tree.TreeNode;
 
 import java.io.Serializable;
@@ -25,9 +24,12 @@ import java.io.Serializable;
 /**
  * Implementation of the Tree interface using collections of objects.
  *
+ * @param <T> Type of values describing nodes.
+ * @param <D> Type of additional data stored in some nodes.
+ * 
  * @author Jakub Strychowski
  */
-public class ObjectTree implements Tree, Serializable {
+public class ObjectTree<T, D> implements Tree<T, D>, Serializable {
 
     /**
      * Unique version of this class.
@@ -37,7 +39,7 @@ public class ObjectTree implements Tree, Serializable {
     /**
      * Root node of the tree.
      */
-    protected ObjectTreeNode root;
+    protected ObjectTreeNode<T> root;
 
     /**
      * Creates a tree with only root node.
@@ -46,45 +48,27 @@ public class ObjectTree implements Tree, Serializable {
         root = ObjectTreeFactory.getInstance().createTreeNode(null);
     }
 
-    /**
-     * Returns the root node of the tree.
-     *
-     * @return The root node.
-     */
     @Override
-    public TreeNode getRoot() {
+    public ObjectTreeNode<T> getRoot() {
         return root;
     }
 
-    /**
-     * Sets the root for this tree.
-     *
-     * @param root New root node.
-     */
     @Override
-    public void setRoot(TreeNode root) {
+    public void setRoot(TreeNode<T> root) {
         if (root == null) {
             throw new NullPointerException("Root cannot be null");
         }
         this.root = (ObjectTreeNode) root;
     }
 
-    /**
-     * Removes all nodes from the tree.
-     */
     @Override
     public void clear() {
         root.clear();
         root.setValue(null);
     }
 
-    /**
-     * Returns a factory which can be used for creation of nodes for this tree.
-     * 
-     * @return Returns an instance of a factory. 
-     */
     @Override
-    public TreeFactory getFactory() {
+    public ObjectTreeFactory<T, D> getFactory() {
         return ObjectTreeFactory.getInstance();
     }
 

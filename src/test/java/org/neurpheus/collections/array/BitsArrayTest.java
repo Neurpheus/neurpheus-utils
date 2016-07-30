@@ -1,9 +1,22 @@
 /*
- *  © 2015 Jakub Strychowski
+ * Neurpheus - Utilities Package
+ *
+ * Copyright (C) 2006-2016 Jakub Strychowski
+ *
+ *  This library is free software; you can redistribute it and/or modify it
+ *  under the terms of the GNU Lesser General Public License as published by the Free
+ *  Software Foundation; either version 3.0 of the License, or (at your option)
+ *  any later version.
+ *
+ *  This library is distributed in the hope that it will be useful, but
+ *  WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ *  or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License
+ *  for more details.
  */
 
 package org.neurpheus.collections.array;
 
+import com.carrotsearch.sizeof.RamUsageEstimator;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -214,23 +227,23 @@ public class BitsArrayTest {
     @Test
     public void testGetAllocationSize() {
         BitsArray instance = new BitsArray(128);
-        assertEquals(16 + 8 * 2, instance.getAllocationSize());
+        assertEquals(RamUsageEstimator.sizeOf(instance), instance.getAllocationSize());
 
         instance.set(4, true);
         instance.compact();
-        assertEquals(16 + 8 * 1, instance.getAllocationSize());
+        assertEquals(RamUsageEstimator.sizeOf(instance), instance.getAllocationSize());
 
         instance.set(127, true);
         instance.compact();
-        assertEquals(16 + 8 * 2, instance.getAllocationSize());
+        assertEquals(RamUsageEstimator.sizeOf(instance), instance.getAllocationSize());
 
         instance.set(128, true);
         instance.compact();
-        assertEquals(16 + 8 * 3, instance.getAllocationSize());
+        assertEquals(RamUsageEstimator.sizeOf(instance), instance.getAllocationSize());
 
         instance.set(4354, true);
         instance.compact();
-        assertEquals(16 + 8 * (1 + 4354 / 64), instance.getAllocationSize());
+        assertEquals(RamUsageEstimator.sizeOf(instance), instance.getAllocationSize());
     }
 
     /**

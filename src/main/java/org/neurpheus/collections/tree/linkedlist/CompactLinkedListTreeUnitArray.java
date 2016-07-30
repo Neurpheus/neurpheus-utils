@@ -1,7 +1,7 @@
 /*
  * Neurpheus - Utilities Package
  *
- * Copyright (C) 2006-2015 Jakub Strychowski
+ * Copyright (C) 2006-2016 Jakub Strychowski
  *
  *  This library is free software; you can redistribute it and/or modify it
  *  under the terms of the GNU Lesser General Public License as published by the Free
@@ -18,14 +18,13 @@ package org.neurpheus.collections.tree.linkedlist;
 
 import org.neurpheus.collections.array.BitsArray;
 import org.neurpheus.collections.array.CompactArray;
+import org.neurpheus.logging.LoggerService;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -33,22 +32,45 @@ import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.neurpheus.logging.LoggerService;
 
 /**
- * Represents an array of linked list units.
+ * Represents an array of linked list units in a compact form.
+ * 
+ * <p>
+ * In this implementation all properties of LLT units are stored as bit-aligned values.
+ * <br>
+ * Compact LLT unit array works in two modes:
+ * <ul>
+ * <li>creation mode - in this mode you can add or set units in the array.</li>
+ * <li>compact mode - readonly mode in which the structure holds only unique units and references to
+ * these units. This approach can reduce memory consumption several times.</li>
+ * </ul>
+ * In both modes integer values are stored in {@link CompactArray} or {link BitArray} collections.
+ * </p>
  *
  * @author Jakub Strychowski
  */
-public class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitArray implements Serializable, LinkedListTreeUnitArray {
+public final class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitArray implements
+        Serializable, LinkedListTreeUnitArray {
 
     
-    private static final Logger LOGGER = LoggerService.getLogger(FastLinkedListTreeUnitArray.class);
-    
+    /** Logger for this class. */
+    @SuppressWarnings("FieldNameHidesFieldInSuperclass")
+    private static final Logger LOGGER = LoggerService.getLogger(
+            CompactLinkedListTreeUnitArray.class);
+
+    /** Message of exception thrown when somebody tries to modify array i compact mode. */
+    private static final String ILLEGAL_STATE_EXCEPTION_MESSAGE
+            = "The unit array is compact now and cannot be modified";
+
     /** Unique serialization identifier of this class. */
+    @SuppressWarnings("FieldNameHidesFieldInSuperclass")
     static final long serialVersionUID = 770608060919195404L;
 
-    static final byte FORMAT_VERSION = 3;
+    static final byte COMPACT_FORMAT_VERSION = 3;
+
+    /** Estimated memory occupied by internal objects of this objects. */
+    public static final int BASE_ALLOCATION_SIZE = 6 * 4 + 7;
 
     /** Holds flags which denote if a word is continued at the given position. */
     private BitsArray wordContinued;
@@ -56,7 +78,7 @@ public class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitAr
     /** Holds flags which denote if a word ends at the given position. */
     private BitsArray wordEnd;
 
-    /** Holds pointers (absolute and relative) */
+    /** Holds pointers (absolute and relative). */
     private CompactArray distance;
 
     /** Holds codes of the values. */
@@ -68,70 +90,84 @@ public class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitAr
     private CompactArray items;
 
     private boolean compact;
-    
-    
-    
-    //private transient boolean[] isNullArray;
 
-    /** Creates a new instance of LinkedListTreeUnitArray */
-    public CompactLinkedListTreeUnitArray(int capacity) {
-        super(capacity);
-        clear(capacity);
+    /**
+     * Creates a new instances of the compact LLT unit array.
+     *
+     * @param capacity The initial storage size.
+     */
+    public CompactLinkedListTreeUnitArray(final int capacity) {
+        ensureCapacity(capacity);
     }
 
+    /**
+     * Creates a new instance of the compact LLT unit array.
+     */
     public CompactLinkedListTreeUnitArray() {
-        super();
+        ensureCapacity(100);
     }
-    
-    /** Creates a new instance of LinkedListTreeUnitArray */
-    public CompactLinkedListTreeUnitArray(LinkedListTreeUnitArray baseArray) {
-        super(baseArray.size());
+
+    /**
+     * Creates a new instance of the compact LLT unit array coping content of the specified base
+     * structure.
+     *
+     * @param baseArray An array from which all units will be added to the newly created array.
+     */
+    public CompactLinkedListTreeUnitArray(final LinkedListTreeUnitArray baseArray) {
         this.valueMapping = baseArray.getValueMapping();
         this.reverseMapping = baseArray.getReverseValueMapping();
-        clear(baseArray.size());
+        ensureCapacity(baseArray.size());
         this.size = baseArray.size();
         for (int i = 0; i < baseArray.size(); i++) {
-            set(i, 
+            set(i,
                 baseArray.getDistance(i),
                 baseArray.isWordEnd(i),
                 baseArray.isWordContinued(i),
                 baseArray.getValueCode(i),
                 baseArray.getDataCode(i)
             );
-            //add(unit);
         }
         compact();
     }
 
-    @Override
-    public void clear(int capacity) {
+    /**
+     * Prepares internal structures to store the specified number of units.
+     *
+     * @param capacity Estimated number of units which will be stored in this structure.
+     */
+    protected void ensureCapacity(final int capacity) {
+        if (compact) {
+            throw new IllegalStateException(ILLEGAL_STATE_EXCEPTION_MESSAGE);
+        }
         wordContinued = new BitsArray(capacity);
         wordEnd = new BitsArray(capacity);
         distance = new CompactArray(capacity, 0);
-        valueCode = new CompactArray(capacity, getValueMapping().length - 1);
+        valueCode = new CompactArray(capacity,
+                                     valueMapping == null ? 0 : getValueMapping().length - 1);
         dataCode = new CompactArray(capacity, 0);
-        items = new CompactArray();
-        //isNullArray = new boolean[capacity];
+        items = null;
         compact = false;
+    }
+
+    @Override
+    public void clear(int capacity) {
+        ensureCapacity(capacity);
+        compact = false;
+        this.size = 0;
     }
 
     @Override
     public void set(final int index, final LinkedListTreeUnit unit) {
         if (compact) {
-            throw new IllegalStateException("The unit array is compact now and cannot be modified");
+            throw new IllegalStateException(ILLEGAL_STATE_EXCEPTION_MESSAGE);
         }
-//        if (index >= isNullArray.length) {
-//            isNullArray = Arrays.copyOf(isNullArray, isNullArray.length * 2);
-//        }
         if (unit == null) {
-            //isNullArray[index] = true;
             distance.setIntValue(index, index);
             wordEnd.set(index, false);
             wordContinued.set(index, false);
             valueCode.setIntValue(index, 0);
             dataCode.setIntValue(index, 0);
         } else {
-            //isNullArray[index] = false;
             dataCode.setIntValue(index, unit.getDataCode());
             distance.setIntValue(index, unit.getDistance());
             wordEnd.set(index, unit.isWordEnd());
@@ -143,27 +179,25 @@ public class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitAr
             }
         }
     }
-    
+
     @Override
     public void set(final int index, final int distance,
                     final boolean wordEnd, final boolean wordContinued,
                     final int valueCode, final int dataCode) {
         if (compact) {
-            throw new IllegalStateException("The unit array is compact now and cannot be modified");
+            throw new IllegalStateException(ILLEGAL_STATE_EXCEPTION_MESSAGE);
         }
-        //this.isNullArray[index] = false;
         this.dataCode.setIntValue(index, dataCode);
         this.distance.setIntValue(index, distance);
         this.wordEnd.set(index, wordEnd);
         this.wordContinued.set(index, wordContinued);
         this.valueCode.setIntValue(index, valueCode);
     }
-    
 
     @Override
     public void add(final LinkedListTreeUnit unit) {
         if (compact) {
-            throw new IllegalStateException("The unit array is compact now and cannot be modified");
+            throw new IllegalStateException(ILLEGAL_STATE_EXCEPTION_MESSAGE);
         }
         int index = this.size;
         set(index, unit);
@@ -187,12 +221,8 @@ public class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitAr
             return valueMapping[valueCode.getIntValue(index)];
         }
     }
-    
-    
-//    public int getValueCodeCompact(final int index) {
-//        return valueCode.getIntValue(items.getIntValue(index));
-//    }
 
+    @Override
     public int getValueCodeFast(final int index) {
         return valueCode.getIntValue(index);
     }
@@ -206,6 +236,7 @@ public class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitAr
         }
     }
 
+    @Override
     public boolean isWordContinuedFast(final int index) {
         return wordContinued.get(index);
     }
@@ -219,6 +250,7 @@ public class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitAr
         }
     }
 
+    @Override
     public boolean isWordEndFast(final int index) {
         return wordEnd.get(index);
     }
@@ -233,19 +265,17 @@ public class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitAr
         }
     }
 
+    @Override
     public boolean isAbsolutePointerFast(final int index) {
         return !wordContinued.get(index) && !wordEnd.get(index);
     }
 
     @Override
     public int getDistance(final int index) {
-        if (compact) {
-            return distance.getIntValue(items.getIntValue(index));
-        } else {
-            return distance.getIntValue(index);
-        }
+        return distance.getIntValue(compact ? items.getIntValue(index) : index);
     }
 
+    @Override
     public int getDistanceFast(final int index) {
         return distance.getIntValue(index);
     }
@@ -259,17 +289,12 @@ public class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitAr
         }
     }
 
+    @Override
     public int getDataCodeFast(final int index) {
         return dataCode.getIntValue(index);
     }
 
-//    @Override
-//    public final boolean isNull(final int index) {
-//        int pos = compact ? (int) items.getLongValue(index) : index;
-//        return isNullArray[pos];
-//        //return !wordEnd.get(pos) && !wordContinued.get(pos) && index == (int) distance.getLongValue(pos);
-//    }
-
+    @Override
     public int getFastIndex(final int index) {
         if (compact) {
             return items.getIntValue(index);
@@ -277,18 +302,17 @@ public class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitAr
             return index;
         }
     }
-    
+
     @Override
+    @SuppressWarnings("squid:S1067")
     public boolean equalsUnits(final int index1, final int index2) {
         int pos1 = compact ? items.getIntValue(index1) : index1;
         int pos2 = compact ? items.getIntValue(index2) : index2;
-        //return (isNullArray[pos1] && isNullArray[pos2]) ||
-        return 
-                (wordEnd.get(pos1) == wordEnd.get(pos2)
-               && wordContinued.get(pos1) == wordContinued.get(pos2)
-               && distance.getIntValue(pos1) == distance.getIntValue(pos2)
-               && valueCode.getIntValue(pos1) == valueCode.getIntValue(pos2)
-               && dataCode.getIntValue(pos1) == dataCode.getIntValue(pos2));
+        return wordEnd.get(pos1) == wordEnd.get(pos2)
+                && wordContinued.get(pos1) == wordContinued.get(pos2)
+                && distance.getIntValue(pos1) == distance.getIntValue(pos2)
+                && valueCode.getIntValue(pos1) == valueCode.getIntValue(pos2)
+                && dataCode.getIntValue(pos1) == dataCode.getIntValue(pos2);
     }
 
     @Override
@@ -297,7 +321,7 @@ public class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitAr
         int dist = distance.getIntValue(pos);
         boolean we = wordEnd.get(pos);
         boolean wc = wordContinued.get(pos);
-        if (!we && !wc && dist == index) {
+        if (!we && !wc && dist == pos) {
             return null;
         }
         return new LinkedListTreeUnit(
@@ -308,7 +332,26 @@ public class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitAr
                 dataCode.getIntValue(pos)
         );
     }
+
+    @Override
+    public boolean isNull(int index) {
+        int pos = compact ? items.getIntValue(index) : index;
+        int dist = distance.getIntValue(pos);
+        boolean we = wordEnd.get(pos);
+        boolean wc = wordContinued.get(pos);
+        return !we && !wc && dist == pos;
+    }
     
+
+    /**
+     * Returns number of different units stored in this array.
+     * <p>
+     * In compact mode this structure holds only unique definitions of units and array of references
+     * to these unique definitions.
+     * </p>
+     *
+     * @return Number of unique units.
+     */
     public int getNumberOfDifferentUnits() {
         if (compact) {
             return valueCode.size();
@@ -333,6 +376,10 @@ public class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitAr
         dataCode = null;
     }
 
+    /**
+     * Reduces memory usage as much as possible. This method finds unique units and all duplicates
+     * will be stored ones. This method also converts all internal arrays into a compact form.
+     */
     public void compact() {
         if (compact) {
             return;
@@ -341,62 +388,75 @@ public class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitAr
         List<LinkedListTreeUnit> list = new ArrayList<>(differentUnits.size());
         list.addAll(differentUnits);
         differentUnits.clear();
-        int index = 0;
         Map map = new HashMap();
+        int index = 0;
         for (LinkedListTreeUnit unit : list) {
-            map.put(unit, new Integer(index));
+            map.put(unit, index);
             index++;
         }
         CompactArray unitsMapping = new CompactArray(size(), list.size());
         for (int i = 0; i < size(); i++) {
             LinkedListTreeUnit unit = get(i);
-            index = ((Integer) map.get(unit)).intValue();
+            index = (Integer) map.get(unit);
             unitsMapping.addIntValue(index);
         }
+        int oldSize = size();
         clear(list.size());
+        this.size = oldSize;
         index = 0;
         for (LinkedListTreeUnit unit : (ArrayList<LinkedListTreeUnit>) list) {
-            set(index, unit);
+            if (unit == null) {
+                set(index, index, false, false, 0, 0);
+            } else {
+                set(index, unit);
+            }
             index++;
         }
         items = unitsMapping;
-        items.compact();
-        wordContinued.compact();
-        wordEnd.compact();
-        distance.compact();
-        valueCode.compact();
-        dataCode.compact();
-        //isNullArray = null;
+        trimToSize();
         compact = true;
     }
 
     @Override
+    public void trimToSize() {
+        if (items != null) {
+            items.compact();
+        }
+        if (wordEnd != null) {
+            wordEnd.compact();
+        }
+        if (wordContinued != null) {
+            wordContinued.compact();
+        }
+        if (distance != null) {
+            distance.compact();
+        }
+        if (valueCode != null) {
+            valueCode.compact();
+        }
+        if (dataCode != null) {
+            dataCode.compact();
+        }
+    }
+
+    @Override
     public long getAllocationSize() {
-        return super.getAllocationSize() 
-                + wordContinued.getAllocationSize()
-                + wordEnd.getAllocationSize()
-                + distance.getAllocationSize()
-                + valueCode.getAllocationSize()
-                + dataCode.getAllocationSize()
-                + items.getAllocationSize();
+        trimToSize();
+        long result = super.getAllocationSize() + BASE_ALLOCATION_SIZE;
+        result += wordContinued != null ? wordContinued.getAllocationSize() : 0;
+        result += wordEnd != null ? wordEnd.getAllocationSize() : 0;
+        result += distance != null ? distance.getAllocationSize() : 0;
+        result += valueCode != null ? valueCode.getAllocationSize() : 0;
+        result += dataCode != null ? dataCode.getAllocationSize() : 0;
+        result += items != null ? items.getAllocationSize() : 0;
+        return result;
     }
 
-    /**
-     * Reads this object data from the given input stream.
-     *
-     * @param in The input stream where this IPB is stored.
-     *
-     * @throws IOException            if any read error occurred.
-     * @throws ClassNotFoundException if this object cannot be instantied.
-     */
-    private void readObject(final ObjectInputStream in) throws IOException, ClassNotFoundException {
-        in.defaultReadObject();
-    }
-
+    @Override
     public void write(DataOutputStream out) throws IOException {
         super.write(out);
         compact();
-        out.writeByte(FORMAT_VERSION);
+        out.writeByte(COMPACT_FORMAT_VERSION);
         out.writeBoolean(compact);
         wordContinued.write(out);
         wordEnd.write(out);
@@ -406,9 +466,10 @@ public class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitAr
         items.write(out);
     }
 
+    @Override
     public void read(DataInputStream in) throws IOException {
         super.read(in);
-        if (FORMAT_VERSION != in.readByte()) {
+        if (COMPACT_FORMAT_VERSION != in.readByte()) {
             throw new IOException("Invalid file format");
         }
         compact = in.readBoolean();
@@ -420,12 +481,6 @@ public class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitAr
         items = CompactArray.readInstance(in);
     }
 
-    public static CompactLinkedListTreeUnitArray readInstance(DataInputStream in) throws IOException {
-        CompactLinkedListTreeUnitArray result = new CompactLinkedListTreeUnitArray();
-        result.read(in);
-        return result;
-    }
-    
     @Override
     public void logStatistics(String name) {
         super.logStatistics(name);
@@ -437,20 +492,13 @@ public class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitAr
         }
     }
 
-   /**
-     * Compares two units.
-     * Units are ordered by their fields in the following order:
-     * valueCode, wordEnd, wordContinued, distance, dataCode.
-     *
-     * @param index1 - position of a first unit to compare with.
-     * @param index2 - position of a second unit to compare with.
-     *
-     * @return 0 if both units are the same, 1 if first unit is greater then second, returns -1 otherwise.
-     */
     @Override
     public int compareUnits(int index1, int index2) {
-        int res = (getValueCode(index1) << 2) + (isWordEnd(index1) ? 2 : 0) + (isWordContinued(index1) ? 1 : 0);
-        res -= (getValueCode(index2) << 2) + (isWordEnd(index2) ? 2 : 0) + (isWordContinued(index2) ? 1 : 0);
+        int res = (getValueCode(index1) << 2) + (isWordEnd(index1) ? 2 : 0) + (isWordContinued(
+                index1) ? 1 : 0);
+        res -= (getValueCode(index2) << 2) 
+                + (isWordEnd(index2) ? 2 : 0) 
+                + (isWordContinued(index2) ? 1 : 0);
         if (res == 0) {
             res = getDistance(index1) - getDistance(index2);
             if (res == 0 && isWordEnd(index1)) {
@@ -458,27 +506,25 @@ public class CompactLinkedListTreeUnitArray extends AbstractLinkedListTreeUnitAr
             }
         }
         return res;
-    }    
+    }
 
     @Override
-    public LinkedListTreeUnitArray subArray(int startIndex, int endIndex) {
-        super.subArray(startIndex, endIndex);
+    public AbstractLinkedListTreeUnitArray subArrayArgumentsVerified(int startIndex, int endIndex) {
         FastLinkedListTreeUnitArray result = new FastLinkedListTreeUnitArray(endIndex - startIndex);
-        
+
         int resultIndex = 0;
         for (int i = startIndex; i < endIndex; i++, resultIndex++) {
             int fastIndex = getFastIndex(i);
-            result.set(resultIndex, 
+            result.set(resultIndex,
                        getDistanceFast(fastIndex),
                        isWordEndFast(fastIndex),
                        isWordContinuedFast(fastIndex),
-                       getValueCode(fastIndex),
+                       getValueCodeFast(fastIndex),
                        getDataCodeFast(fastIndex)
-                       );
+            );
         }
-        
+
         return result;
     }
-    
 
 }

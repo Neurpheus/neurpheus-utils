@@ -26,7 +26,6 @@ import java.util.Iterator;
 import org.neurpheus.collections.tree.Tree;
 import org.neurpheus.collections.tree.TreeNodeWithData;
 import org.neurpheus.collections.tree.TreeNode;
-import org.neurpheus.core.string.MutableString;
 import org.neurpheus.collections.tree.linkedlist.LinkedListTree;
 import org.neurpheus.collections.tree.linkedlist.LinkedListTreeUnit;
 import org.neurpheus.collections.tree.linkedlist.LinkedListTreeUnitArray;
@@ -57,7 +56,7 @@ public class TreeHelper {
                     tmp.append(unit.getValueCode());
                     tmp.append(']');
                 } else {
-                    tmp.append(MutableString.getChar((byte) unit.getValueCode()));
+                    tmp.append((byte) unit.getValueCode());
                     if (unit.getDistance() > 0) {
                         tmp.append('(');
                         tmp.append(unit.getDistance());

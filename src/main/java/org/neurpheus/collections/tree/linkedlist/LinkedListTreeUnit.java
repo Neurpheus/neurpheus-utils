@@ -1,7 +1,7 @@
 /*
  * Neurpheus - Utilities Package
  *
- * Copyright (C) 2006-2015 Jakub Strychowski
+ * Copyright (C) 2006-2016 Jakub Strychowski
  *
  *  This library is free software; you can redistribute it and/or modify it
  *  under the terms of the GNU Lesser General Public License as published by the Free
@@ -16,17 +16,16 @@
 
 package org.neurpheus.collections.tree.linkedlist;
 
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 /**
  * A single element of a linked list structure representing a tree.
  * <p>
  * The Linked List Tree (LLT) consists of structural units. Symbols associated with the units
- * describe edges between nodes on different level of the tree. Each unit contains following
- * information:
+ * describe edges between nodes on different level of the tree. 
+ * Each unit represents a single node, and holds pointer to a sibling node.
+ * A unit contains the following information:
  * <ul>
  * <li>valueCode - a symbol describing an edge</li>
  * <li>distance - a relative pointer to a next unit describing a node having the same parent as the
@@ -236,6 +235,7 @@ public class LinkedListTreeUnit implements Comparable {
      * @return 0 if both units are the same, 1 if current node is greater then obj, else returns -1.
      */
     @Override
+    @SuppressWarnings({"squid:MethodCyclomaticComplexity"})
     public int compareTo(final Object obj) {
         if (obj != null && obj instanceof LinkedListTreeUnit) {
             final LinkedListTreeUnit unit2 = (LinkedListTreeUnit) obj;
@@ -253,6 +253,13 @@ public class LinkedListTreeUnit implements Comparable {
         }
     }
     
+    /**
+     * Returns a set of unique units use by the specified unit array.
+     *
+     * @param unitArray The source unit array.
+     * 
+     * @return Collection of different units used by the specified input structure.
+     */
     public static Set<LinkedListTreeUnit> getDifferentUnits(LinkedListTreeUnitArray unitArray) {
         Set<LinkedListTreeUnit> result = new HashSet<>();
         
@@ -263,6 +270,7 @@ public class LinkedListTreeUnit implements Comparable {
         return result;
     }
     
+    @Override
     public String toString() {
         StringBuilder builder = new StringBuilder();
         builder.append("{valueCode: ").append(this.valueCode).append(',');

@@ -35,7 +35,7 @@ public interface TreeFactory<T, D> {
      * 
      * @return A new tree objects.
      */
-    Tree createTree();
+    Tree<T, D> createTree();
     
     /**
      * Creates a new node for a tree.
@@ -44,7 +44,7 @@ public interface TreeFactory<T, D> {
      * 
      * @return constructed node.
      */
-    TreeNode createTreeNode(T value);
+    TreeNode<T> createTreeNode(T value);
 
     /**
      * Creates a new node holding additional data in a tree.
@@ -54,7 +54,7 @@ public interface TreeFactory<T, D> {
      * 
      * @return constructed node.
      */
-    TreeNodeWithData createTreeNodeWithAdditionalData(T value, D data);
+    TreeNodeWithData<T, D> createTreeNodeWithAdditionalData(T value, D data);
 
 
 }

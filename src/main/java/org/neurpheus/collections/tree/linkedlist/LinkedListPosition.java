@@ -1,7 +1,7 @@
 /*
  * Neurpheus - Utilities Package
  *
- * Copyright (C) 2006-2015 Jakub Strychowski
+ * Copyright (C) 2006-2016 Jakub Strychowski
  *
  *  This library is free software; you can redistribute it and/or modify it
  *  under the terms of the GNU Lesser General Public License as published by the Free
@@ -17,9 +17,9 @@
 package org.neurpheus.collections.tree.linkedlist;
 
 /**
- * Represents a single element of a linked list (compressed form of a tree).
- * This class helps in traversing a tree stored in a packed form.
- * 
+ * Represents a single element of a linked list (compressed form of a tree). This class helps in
+ * traversing a tree stored in a packed form.
+ *
  * @author Jakub Strychowski
  */
 class LinkedListPosition {
@@ -28,39 +28,36 @@ class LinkedListPosition {
      * Position of element on the linked list.
      */
     private int pos;
-    
+
     /**
      * Position to which algorithms should return after processing current part of the list.
      */
     private LinkedListPosition returnPos;
-    
+
     /**
-     * How many elements can be read from the list before algorithm 
-     * should return to previous fragment of the list.
+     * How many elements can be read from the list before algorithm should return to previous
+     * fragment of the list.
      */
     private int unitsToRead;
-    
+
     /**
      * <code>true</code> if the current position is nested part of other fragment in the list.
      */
     private boolean nested;
-    
-    
+
     /**
-     * Flaga informuj¹ca czy sprawdzono czy dana pozycja jest
-     * wskaŸnikiem i czy przetworzono ten wskaŸnik zmieniaj¹c
-     * pozycjê na pozycjê odpowiadaj¹c¹ wskazywanemu
-     * podci¹gowi.
+     * Indicates if this position in a units array holds an absolute pointer and if this pointer has
+     * been evaluated.
      */
     private boolean absProcessed;
-    
+
     /**
      * Local reference to the internal representation of a linked list.
      */
     private LinkedListTreeUnitArray unitArray;
 
-    public LinkedListPosition(LinkedListTreeUnitArray unitArray, int pos,
-                              LinkedListPosition returnPos, int unitsToRead, boolean nested) {
+    protected LinkedListPosition(LinkedListTreeUnitArray unitArray, int pos,
+                                 LinkedListPosition returnPos, int unitsToRead, boolean nested) {
         this.unitArray = unitArray;
         this.pos = pos;
         this.returnPos = returnPos;
@@ -69,18 +66,7 @@ class LinkedListPosition {
         this.absProcessed = false;
     }
 
-    public LinkedListPosition(LinkedListTreeUnitArray unitArray, int pos,
-                              LinkedListPosition returnPos, int unitsToRead, boolean nested,
-                              boolean absProcessed) {
-        this.unitArray = unitArray;
-        this.pos = pos;
-        this.returnPos = returnPos;
-        this.unitsToRead = unitsToRead;
-        this.nested = nested;
-        this.absProcessed = absProcessed;
-    }
-
-    public LinkedListPosition(LinkedListPosition basePos) {
+    protected LinkedListPosition(LinkedListPosition basePos) {
         this.unitArray = basePos.unitArray;
         this.pos = basePos.pos;
         this.returnPos = basePos.returnPos;
@@ -89,32 +75,27 @@ class LinkedListPosition {
         this.absProcessed = basePos.absProcessed;
     }
 
-    public int getDistance() {
+    protected int getDistance() {
         if (!absProcessed) {
             processAbsolutePointer();
         }
         return unitArray.getDistance(pos);
     }
 
-    public LinkedListPosition nextLevel() {
-        if (!absProcessed) {
-            processAbsolutePointer();
-        }
+    protected LinkedListPosition nextLevel() {
         if (unitArray.isWordContinued(pos)) {
             if (nested && unitsToRead <= 1) {
                 return returnPos;
             } else {
-                return new LinkedListPosition(unitArray, pos + 1, returnPos, unitsToRead - 1, nested);
+                return new LinkedListPosition(unitArray, pos + 1,
+                                              returnPos, unitsToRead - 1, nested);
             }
         } else {
             return null;
         }
     }
 
-    public LinkedListPosition goToNextLevel() {
-        if (!absProcessed) {
-            processAbsolutePointer();
-        }
+    protected  LinkedListPosition goToNextLevel() {
         if (unitArray.isWordContinued(pos)) {
             if (nested && unitsToRead <= 1) {
                 return returnPos == null ? null : new LinkedListPosition(returnPos);
@@ -125,10 +106,7 @@ class LinkedListPosition {
         return null;
     }
 
-    public LinkedListPosition nextChild() {
-        if (!absProcessed) {
-            processAbsolutePointer();
-        }
+    protected  LinkedListPosition nextChild() {
         int d = unitArray.getDistance(pos);
         if (d > 0) {
             int target = pos + d;
@@ -142,10 +120,7 @@ class LinkedListPosition {
         }
     }
 
-    public LinkedListPosition goToNextChild() {
-        if (!absProcessed) {
-            processAbsolutePointer();
-        }
+    protected  LinkedListPosition goToNextChild() {
         int d = unitArray.getDistance(pos);
         if (d > 0) {
             int target = pos + d;
@@ -162,34 +137,27 @@ class LinkedListPosition {
         }
     }
 
-    public boolean isWordContinued() {
+    protected  boolean isWordContinued() {
         if (!absProcessed) {
             processAbsolutePointer();
         }
         return unitArray.isWordContinued(pos);
     }
 
-    public boolean isWordEnd() {
+    protected  boolean isWordEnd() {
         if (!absProcessed) {
             processAbsolutePointer();
         }
         return unitArray.isWordEnd(pos);
     }
 
-    public int getValueMapped() {
+    protected  int getValueMapped() {
         if (!absProcessed) {
             processAbsolutePointer();
         }
         return unitArray.getValueCode(pos);
     }
 
-    public int getValue() {
-        if (!absProcessed) {
-            processAbsolutePointer();
-        }
-        return unitArray.getValueMapping()[unitArray.getValueCode(pos)];
-    }
-    
     public LinkedListTreeUnit getUnit() {
         if (!absProcessed) {
             processAbsolutePointer();
@@ -222,10 +190,6 @@ class LinkedListPosition {
         this.returnPos = null;
     }
 
-    public LinkedListPosition getCopy() {
-        return new LinkedListPosition(this);
-    }
-
     public int getPos() {
         return pos;
     }
@@ -234,7 +198,7 @@ class LinkedListPosition {
         return returnPos;
     }
 
-    public void setReturnPos(LinkedListPosition pos) {
+    protected  void setReturnPos(LinkedListPosition pos) {
         returnPos = pos;
     }
 
@@ -246,8 +210,8 @@ class LinkedListPosition {
         return nested;
     }
 
-    public void setAbsProcessed(boolean v) {
-        absProcessed = v;
+    protected void setAbsProcessed(boolean newValue) {
+        absProcessed = newValue;
     }
 
     public LinkedListTreeUnitArray getUnitArray() {
@@ -255,25 +219,32 @@ class LinkedListPosition {
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if ((obj == null) || !(obj instanceof LinkedListPosition)) {
-            return false;
-        }
-        return equalsLinkedListPosition((LinkedListPosition) obj);
+    public int hashCode() {
+        return pos
+                ^ (returnPos == null ? 0 : returnPos.hashCode())
+                ^ unitsToRead
+                ^ (nested ? 0 : 0xa3d7)
+                ^ (absProcessed ? 0 : 0x34b8);
     }
 
     @Override
-    public int hashCode() {
-        return pos ^ (returnPos == null ? 0 : returnPos.hashCode()) ^ unitsToRead ^ (nested ? 0 : 0xa3d7) ^ (absProcessed ? 0 : 0x34b8);
+    public boolean equals(Object anObject) {
+        if (anObject == this) {
+            return true;
+        }
+        if (anObject instanceof LinkedListPosition) {
+            return equalsLinkedListPosition((LinkedListPosition) anObject);
+        }
+        return false;
     }
 
-    public boolean equalsLinkedListPosition(LinkedListPosition b) {
-        if ((pos == b.pos && nested == b.nested)
-                && (unitsToRead == b.unitsToRead && absProcessed == b.absProcessed)) {
-            if (returnPos == null || b.returnPos == null) {
-                return returnPos == null && b.returnPos == null;
+    private boolean equalsLinkedListPosition(LinkedListPosition pos2) {
+        if ((pos == pos2.pos && nested == pos2.nested)
+                && (unitsToRead == pos2.unitsToRead && absProcessed == pos2.absProcessed)) {
+            if (returnPos == null || pos2.returnPos == null) {
+                return returnPos == null && pos2.returnPos == null;
             } else {
-                return returnPos.equalsLinkedListPosition(b.returnPos);
+                return returnPos.equalsLinkedListPosition(pos2.returnPos);
             }
 
         }

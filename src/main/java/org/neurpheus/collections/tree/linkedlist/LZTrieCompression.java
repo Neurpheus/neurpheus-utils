@@ -1,7 +1,7 @@
 /*
  * Neurpheus - Utilities Package
  *
- * Copyright (C) 2006-2015 Jakub Strychowski
+ * Copyright (C) 2006-2016 Jakub Strychowski
  *
  *  This library is free software; you can redistribute it and/or modify it
  *  under the terms of the GNU Lesser General Public License as published by the Free
@@ -33,16 +33,32 @@ import java.util.logging.Logger;
 
 /**
  * Compresses linked list tree using the LZ-based compression algorithm.
+ * <p>
+ * The LZTire compression algorithm search for duplicated fragments in a tree structure, and
+ * replaces these fragments with pointers to their first occurrences.
+ * </p>
+ *
+ * <p>
+ * This algorithm has time complexity O(N^2) where N is number of units in the array. To speed up
+ * compression this algorithm splits input units array into partitions. A partition is a list of
+ * equal sequences of two units in the array. Each partition is compressed separately. Therefore
+ * real complexity is O(P * S^2) where P is number of partitions and S is the size of a larger
+ * partition.
+ * </p>
+ *
+ * <p>
+ * The space complexity of this algorithm is O(N).
+ * </p>
  *
  * <p>
  * <b>Usage:</b>
  * <br>
  * <code><pre>
  * LinkedListTree tree = ...;
- * double ratio = LZTrieCompression.compress(tree);
- * System.out.println("The tree occuppies " + ratio + "% of initial size now");
+ * LinkedListTree compressedTree = LZTrieCompression.compress(tree, false);
  * </pre></code>
  * </p>
+ *
  * <p>
  * You can find more informations about the compression algorithm in the following publications:
  * <ul>
@@ -53,11 +69,17 @@ import java.util.logging.Logger;
  * <li>
  * Strahil Ristov : "LZ trie and dictionary compression".
  * </li>
+ * <li>
+ * Jakub Strychowski : "Analiza morfologiczna języka naturalnego z wykorzystaniem sztucznych 
+ * sieci neuronowych", PhD thesis, Poznan University of Technlogy, 02.07.2009.
+ * </li>
  * </ul>
  * </p>
+ *
  * <p>
- * <b>Acknowledgements:</b> The author of this implementation is great full to Stasa Ristov for the
- * help with understanding some difficult aspects of the algorithm.
+ * <strong>Acknowledgments:</strong><br>
+ * The author of this implementation is great full to Stasa Ristov for the help with understanding
+ * some difficult aspects of the algorithm.
  * </p>
  *
  * @author Jakub Strychowski
@@ -78,57 +100,106 @@ public class LZTrieCompression {
      * compression, if a unit structure should be packed more.
      * </p>
      */
-    private static int maxReplacementLength = 127;
+    private static final int MAX_REPLACEMENT_LENGTH = 127;
 
-    public int maxPartitionSize = Integer.MAX_VALUE;
+    /** Experimental constant to limit the algorithm complexity using partition size limit. */
+    private static final int MAX_PARTITION_SIZE = Integer.MAX_VALUE;
 
-    private static int defaultDivideAndRuleTreshold = 10_000000;
-    //private static int defaultDivideAndRuleTreshold = 100_000_000;
+    /** Size of a synchronized fragment of a unit array. */
+    private static int SYNCHRONIZATION_PAGE_SIZE = MAX_REPLACEMENT_LENGTH * 5;
 
-    // page should be greater then maxReplacementLength
-    private static int SYNCHRONIZATION_PAGE_SIZE = maxReplacementLength * 5;
+    /** Info message for logger. */
+    private static final String SEARCHING_MESSAGE = "   searching for duplicated tree fragments";
 
+    /** Positions of alphabetically orderer suffixes of unit sequences. * */
     private int[] suffixArray;
+
+    /** Array of units to compress. */
     private LinkedListTreeUnitArray units;
+
+    /** A comparator used for units sorting. */
     private SuffixArrayComparator comparator;
+
+    /** Array of units used for compression. */
     private LinkedListTreeUnitArray work;
+
+    /** Array of flags marking positions in unit array as empty (replaced by pointers). */
     private boolean[] isWorkNull;
+
+    /** Distance to next not null element in the work array - used for speed up. */
     private int[] nextNotNull;
+
+    /** Each element contains a back pointers to a previous child (unit) or 0. */
     private int[] localPointers;
+
+    /**
+     * A bit at position x decides if a unit at position x points absolutely to different area in
+     * the structure.
+     */
     private BitSet absolutePointers;
+
+    /**
+     * A bit at position x decides if a unit at position x is pointed by any unit in the structure.
+     */
     private BitSet absolutePointersEnds;
+
+    /** Number of elements in a unit array before compression. */
     private int sizeBefore;
+
+    /** Number of units in a unit array. */
     private int unitsLength;
 
+    /** Compressed tree. */
     private LinkedListTree processedTree;
 
-    int maxSuffixArrayPos;
-    //int partitionEnd;
-    long startTime;
-    long lastTime;
-    int progress;
-    long maxProgress;
-    boolean[] processed;
-    boolean parallel;
+    private int maxSuffixArrayPos;
 
+    /** System time when compression started. */
+    private long startTime;
+
+    /** System time when progress was logged out. */
+    private long lastTime;
+
+    /** Compression progress (number of operations on units). */
+    private int progress;
+
+    /** Maximum progress value. */
+    private long maxProgress;
+
+    /** Marks already processed units. */
+    private boolean[] processed;
+
+    /**
+     * If {@code true} use parallel compression.
+     */
+    private boolean parallel;
+
+    /**
+     * Parallel compression splits a units array to sub arrays called pages. Each page may be
+     * separately locked to protect concurrent modification by threads.
+     */
     AtomicLong[] synchroniationPages;
-
-    /** Creates a new instance of LZTrieCompression. */
-    private LZTrieCompression() {
-    }
 
     private LZTrieCompression(LinkedListTree tree, boolean parallelMode) {
         this.processedTree = tree;
         this.parallel = parallelMode;
-
     }
 
     /**
-     * Compresses linked list tree using the LZ-based compression algorithm.
+     * Compresses the specified linked list tree using the LZ-based compression algorithm.
+     * <p>
+     * Note: Parallel compression is experimental solution (sometimes producing an incoherent tree
+     * structure). It can compress a big tree much faster but with lower compression ratio. You can
+     * use this compression for trees with very large units arrays (for example for compressing
+     * trees represented by tens of millions of units). In this mode each partition is compressed by
+     * a separate thread but subsequences from different partitions overlap each other causing some
+     * difficulties witch ensuring coherency of a linked list tree internal structure.
+     * </p>
      *
-     * @param tree The tree to compress.
+     * @param tree         The tree to compress.
+     * @param parallelMode if {@code true} use parallel compression.
      *
-     * @return The compression ratio as a percentage size of the source tree.
+     * @return The compressed tree.
      */
     public static LinkedListTree compress(final LinkedListTree tree, boolean parallelMode) {
         LZTrieCompression compr = new LZTrieCompression(tree, parallelMode);
@@ -145,37 +216,36 @@ public class LZTrieCompression {
      * @param iPos The position of a substring which is replacement.
      * @param jPos The position of a substring which should be replaced.
      *
-     * @return The number of units which can be repleaced.
+     * @return The number of units which can be replaced.
      */
+    @SuppressWarnings({"squid:MethodCyclomaticComplexity", "squid:S1067"})
     private int getReplacementLength(int iPos, int jPos) {
         int res = 0;
         int i = iPos;
         int j = jPos;
         boolean matched;
         LinkedListTreeUnitArray localWork = work;
-        int maxRes = maxReplacementLength;
-        boolean aPointerEnd = false;
+        int maxRes = MAX_REPLACEMENT_LENGTH;
+        boolean absolutePointerEnd = false;
         do {
 
             // move j to not null position
             while (j < unitsLength && isWorkNull[j]) {
-                //++j;
                 j += nextNotNull[j];
             }
 
             // move i to not null position
             while (i < j && i < jPos && i < unitsLength && isWorkNull[i]) {
-                //++i;
                 i += nextNotNull[i];
             }
-            /*
-             */
+
             matched
-                    = // checks RULE 4:  the substring with is a part of a replacement for other sbstrings cannot be replaced 
-                    //                 if a new replacement contains characters which occurrs after the substring 
-                    !aPointerEnd
-                    // RULE 0: the length of a replacement is limited because the length is coded on a
-                    // limited number of bits; RULE 1: prevent substrings overlaping
+                    = // checks RULE 4:  the substring with is a part of a replacement for 
+                    // other sbstrings cannot be replaced if a new replacement contains
+                    //  characters which occurrs after the substring
+                    !absolutePointerEnd
+                    // RULE 0: the length of a replacement is limited because the length is coded 
+                    // on a limited number of bits; RULE 1: prevent substrings overlaping. 
                     && res < maxRes
                     // general conditions - units equals
                     && i < j && i < jPos && j < unitsLength
@@ -183,11 +253,13 @@ public class LZTrieCompression {
                     // checks RULE 3: no l-pointers pointing into the replaced substring
                     //                from outside of this subtring. Only first unit 
                     //                in the substring can be pointed from outside unit.
-                    && (j == jPos || (!absolutePointers.get(j) && (localPointers[j] == 0 || localPointers[j] >= jPos)));
-            ;
+                    && (j == jPos
+                    || (!absolutePointers.get(j)
+                    && (localPointers[j] == 0 || localPointers[j] >= jPos)));
+
             if (matched) {
                 ++res;
-                aPointerEnd = absolutePointersEnds.get(j);
+                absolutePointerEnd = absolutePointersEnds.get(j);
                 i += nextNotNull[i];
                 j += nextNotNull[j];
             }
@@ -216,49 +288,6 @@ public class LZTrieCompression {
     /**
      *
      * @param pos
-     *
-     * @return
-     */
-    private int determineNumberOfUnits(int pos) {
-        int numberOfUnits = 0;
-        int curPos = pos;
-        boolean stop = false;
-        int maxtarget = 0;
-        do {
-            if (!isWorkNull[curPos]) {
-                //LinkedListTreeUnit unit = work.get(curPos);
-                stop = true;
-                int fastIndex = work.getFastIndex(curPos);
-                if (work.isAbsolutePointerFast(fastIndex)) {
-                    int vc = work.getValueCode(fastIndex);
-                    if (vc > 0) {
-                        numberOfUnits += vc;
-                        stop = false;
-                    } else {
-                        numberOfUnits += determineNumberOfUnits(work.getDistanceFast(fastIndex));
-                    }
-                } else {
-                    numberOfUnits++;
-                    int dis = work.getDistanceFast(fastIndex);
-                    if (dis > 0) {
-                        int target = curPos + dis;
-                        if (maxtarget < target) {
-                            maxtarget = target;
-                        }
-                    }
-                    if (work.isWordContinuedFast(fastIndex) || curPos <= maxtarget) {
-                        stop = false;
-                    }
-                }
-            }
-            ++curPos;
-        } while (!stop);
-        return numberOfUnits;
-    }
-
-    /**
-     *
-     * @param pos
      * @param length
      *
      * @return
@@ -269,7 +298,6 @@ public class LZTrieCompression {
         int lastUnitPos = 0;
         for (int i = pos; tmp > 0; i++) { // NOSONAR
             if (!isWorkNull[i]) {
-                //LinkedListTreeUnit unit = work.get(i);
                 int fastIndex = work.getFastIndex(i);
                 numberOfUnits++;
                 --tmp;
@@ -277,8 +305,6 @@ public class LZTrieCompression {
                     int vc = work.getValueCode(fastIndex);
                     if (vc > 0) {
                         numberOfUnits += vc - 1;
-                    } else {
-                        numberOfUnits += determineNumberOfUnits(work.getDistanceFast(fastIndex)) - 1;
                     }
                 }
                 lastUnitPos = i;
@@ -310,13 +336,11 @@ public class LZTrieCompression {
     }
 
     private void createBackPointersArray() {
-        // create back pointers array
         LOGGER.finer("   creating back pointer arrays...");
         localPointers = new int[unitsLength];
         absolutePointers = new BitSet(unitsLength);
         absolutePointersEnds = new BitSet(unitsLength);
         for (int i = 0; i < unitsLength; i++) {
-            //LinkedListTreeUnit unit = units.get(i);
             if (units.getDistance(i) > 0) {
                 if (units.isAbsolutePointer(i)) {
                     absolutePointers.set(units.getDistance(i), true);
@@ -332,10 +356,7 @@ public class LZTrieCompression {
     }
 
     private void createTemporaryResultArray() {
-
-        // create temporary result array
         LOGGER.finer("   creating temorary result array...");
-        //work = new FastLinkedListTreeUnitArray(units);
         if (units instanceof CompactLinkedListTreeUnitArray) {
             work = new FastLinkedListTreeUnitArray(units);
         } else {
@@ -398,7 +419,7 @@ public class LZTrieCompression {
     }
 
     protected void mainLoopSecond() {
-        LOGGER.finer("   searching for duplicated tree fragments...");
+        LOGGER.finer(SEARCHING_MESSAGE + "...");
         // search partitions
         List<Integer> partitionPoints = findPartitions();
         int partitionStart = 0;
@@ -406,12 +427,11 @@ public class LZTrieCompression {
             processPartition(partitionStart, partitionPoint);
             partitionStart = partitionPoint;
         }
-        LOGGER.finer(
-                "    searching for duplicated tree fragments: 100%. Preparing final LZTrie data.");
+        LOGGER.finer(SEARCHING_MESSAGE + ": 100%. Preparing final LZTrie data.");
     }
 
     protected void mainLoopParallel() {
-        LOGGER.finer("   searching for duplicated tree fragments...");
+        LOGGER.finer(SEARCHING_MESSAGE + "...");
         int cores = Math.max(1, Runtime.getRuntime().availableProcessors() - 1);
         ThreadPoolExecutor pool = (ThreadPoolExecutor) Executors.newFixedThreadPool(cores);
         List<Integer> partitionPoints = findPartitions();
@@ -427,8 +447,7 @@ public class LZTrieCompression {
             Logger.getLogger(LZTrieCompression.class.getName()).log(Level.SEVERE, null, ex);
         }
         pool.shutdown();
-        LOGGER.finer(
-                "    searching for duplicated tree fragments: 100%. Preparing final LZTrie data.");
+        LOGGER.finer(SEARCHING_MESSAGE + ": 100%. Preparing final LZTrie data.");
     }
 
     protected void processPartition(int partitionStart, int partitionEnd) {
@@ -445,18 +464,18 @@ public class LZTrieCompression {
 
     protected List<Integer> findPartitions() {
         List<Integer> partitionPoints = new ArrayList<>();
-        for (int i = 0; i < maxSuffixArrayPos;) {
+        int partitionEnd;
+        for (int i = 0; i < maxSuffixArrayPos; i = partitionEnd) {
             int iPos = suffixArray[i];
-            int partitionEnd = i + 1;
+            partitionEnd = i + 1;
             int posB = suffixArray[partitionEnd];
             while ((partitionEnd < maxSuffixArrayPos)
-                    && ((partitionEnd - i) < maxPartitionSize)
+                    && ((partitionEnd - i) < MAX_PARTITION_SIZE)
                     && units.equalsUnits(iPos, posB)
                     && units.equalsUnits(iPos + 1, posB + 1)) {
                 ++partitionEnd;
                 posB = suffixArray[partitionEnd];
             }
-            i = partitionEnd;
             partitionPoints.add(partitionEnd);
         }
         return partitionPoints;
@@ -483,14 +502,12 @@ public class LZTrieCompression {
 
     protected int findPartitionEnd(final int i, final int iPos) {
         int partitionEnd = i + 1;
-        int partitionSize = 0;
         int posB = suffixArray[partitionEnd];
         while ((partitionEnd < maxSuffixArrayPos)
-                && ((partitionEnd - i) < maxPartitionSize)
+                && ((partitionEnd - i) < MAX_PARTITION_SIZE)
                 && units.equalsUnits(iPos, posB)
                 && units.equalsUnits(iPos + 1, posB + 1)) {
             ++partitionEnd;
-            partitionSize++;
             posB = suffixArray[partitionEnd];
         }
         return partitionEnd;
@@ -530,10 +547,10 @@ public class LZTrieCompression {
         absolutePointers.set(iPos, true);
         work.set(jPos, iPos, false, false, nofu, 0);
         isWorkNull[jPos] = false;
-        //aPointersEnds[iPos.intValue() + replacementLength - 1] = true;                                
-        --replacementLength;
+        int len = replacementLength;
+        --len;
         boolean isReplacementEnd = false;
-        for (int k = 1; replacementLength > 0; k++) { // NOSONAR
+        for (int k = 1; len > 0; k++) { // NOSONAR
             if (!isWorkNull[jPos + k]) {
                 if (!processed[jPos + k]) {
                     progress++;
@@ -541,7 +558,7 @@ public class LZTrieCompression {
                 isReplacementEnd = absolutePointersEnds.get(jPos + k);
                 work.set(jPos + k, null);
                 isWorkNull[jPos + k] = true;
-                --replacementLength;
+                --len;
             }
         }
         updateNotNullDistance(jPos);
@@ -614,7 +631,6 @@ public class LZTrieCompression {
     }
 
     protected void updateTwoWayPointers() {
-        // update two-way pointers lengths
         LOGGER.fine("   updating two-way pointers lengths....");
         LinkedListTreeUnitArray tmpUnitArray = processedTree.getUnitArray();
         for (int i = tmpUnitArray.size() - 1; i >= 0; i--) {
@@ -623,7 +639,6 @@ public class LZTrieCompression {
                 int len = unit.getValueCode();
                 if (len > 0) {
                     for (int j = unit.getDistance(); j < unit.getDistance() + len; j++) {
-                        //final LinkedListTreeUnit u = tmpUnitArray.get(j);
                         if (tmpUnitArray.isAbsolutePointer(j)) {
                             len -= tmpUnitArray.getValueCode(j) - 1;
                         }
@@ -664,9 +679,6 @@ public class LZTrieCompression {
     private void clear() {
         suffixArray = null;
         units = null;
-        if (comparator != null) {
-            comparator.clear();
-        }
         comparator = null;
         work = null;
         localPointers = null;

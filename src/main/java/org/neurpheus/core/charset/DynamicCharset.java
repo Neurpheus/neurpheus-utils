@@ -27,6 +27,7 @@ import java.util.Arrays;
 /**
  * Encodes and decodes Unicode characters using dynamically created mapping between characters and
  * bytes.
+ * 
  * <p>
  * This class ensures that characters from a particular alphabet, which contains no more than 255
  * signs, can be encoded as single bytes. A mapping between characters and bytes changes dynamically
@@ -47,10 +48,10 @@ import java.util.Arrays;
  * </p>
  * <p>
  * <b><i>
- * Each instance of the dynamic charset should have a unique canonical name beacuse the SUN
- * implementation of the Charset.encode method uses chached encoders. This causes that new dynamic
- * charset instances, which have the same canonical name like the instance previosly created, use
- * invalid encoder (encoder created for the first instance). For dynamic charsets it is importand to
+ * Each instance of the dynamic charset should have a unique canonical name because the SUN
+ * implementation of the Charset.encode method uses cached encoders. This causes that new dynamic
+ * charset instances, which have the same canonical name like the instance previously created, use
+ * invalid encoder (encoder created for the first instance). For dynamic charsets it is important to
  * use an encoder created for a particular instance and not for all instances having the same
  * canonical names.
  * </i></b></p>
@@ -72,8 +73,13 @@ public class DynamicCharset extends Charset {
     public static final int BYTE_MAX = 255;
 
     /** Value used for a conversion from bytes to unsigned bytes. */
-    public static final int TO_BYTE = 0xFF;
+    private static final int TO_BYTE = 0xFF;
 
+    /**
+     * Characters available on keyboard, Polish characters, whitespaces, numbers.
+     */
+    private static final String POLISH_ALPHABET = "ęóąśłżźćńĘÓĄŚŁŻŹĆŃ";
+    
     /** Characters to bytes mapping array. */
     private byte[] char2byte;
 
@@ -112,7 +118,7 @@ public class DynamicCharset extends Charset {
         Arrays.fill(this.byte2char, UNKNOWN_CHARACTER);
         this.encoder = new DynamicCharsetEncoder(this);
         this.decoder = new DynamicCharsetDecoder(this);
-        this.decoder.replaceWith("" + UNKNOWN_CHARACTER);
+        this.decoder.replaceWith(Character.toString(UNKNOWN_CHARACTER));
     }
 
     /**
@@ -174,27 +180,27 @@ public class DynamicCharset extends Charset {
      * many mappings for a single character what can occur if many threads encodes strings using
      * this object.
      *
-     * @param c A character which should be encoded by this this charset
+     * @param ch A character which should be encoded by this this charset
      *
      * @return A byte code representing the character or {@link UNKNOWN_CHARACTER_CODE} if no more
      *         characters can be mapped by this charset.
      */
-    public synchronized byte addCharacter(final char c) {
+    public synchronized byte addCharacter(final char ch) {
         // make sure if another thread didn't add character
-        if (c <= this.maxChar && this.char2byte[c] != UNKNOWN_CHARACTER_CODE) {
-            return this.char2byte[c];
+        if (ch <= this.maxChar && this.char2byte[ch] != UNKNOWN_CHARACTER_CODE) {
+            return this.char2byte[ch];
         }
         if (this.maxByte < BYTE_MAX) {
             ++this.maxByte;
-            this.byte2char[this.maxByte] = c;
-            if (c > this.maxChar) {
-                byte[] tmp = new byte[c + 1];
+            this.byte2char[this.maxByte] = ch;
+            if (ch > this.maxChar) {
+                byte[] tmp = new byte[ch + 1];
                 System.arraycopy(this.char2byte, 0, tmp, 0, this.char2byte.length);
                 Arrays.fill(tmp, this.char2byte.length, tmp.length, UNKNOWN_CHARACTER_CODE);
-                this.maxChar = c;
+                this.maxChar = ch;
                 this.char2byte = tmp;
             }
-            this.char2byte[c] = (byte) this.maxByte;
+            this.char2byte[ch] = (byte) this.maxByte;
             return (byte) this.maxByte;
         } else {
             this.changeable = false;
@@ -205,24 +211,24 @@ public class DynamicCharset extends Charset {
     /**
      * Encodes the given character to its byte code.
      *
-     * @param c A character to encode.
+     * @param ch A character to encode.
      *
      * @return Byte code representation of the character.
      */
-    public byte fastEncode(final char c) {
-        byte b = (c <= this.maxChar) ? this.char2byte[c] : UNKNOWN_CHARACTER_CODE;
-        return (this.changeable && b == UNKNOWN_CHARACTER_CODE) ? this.addCharacter(c) : b;
+    public byte fastEncode(final char ch) {
+        byte res = (ch <= this.maxChar) ? this.char2byte[ch] : UNKNOWN_CHARACTER_CODE;
+        return (this.changeable && res == UNKNOWN_CHARACTER_CODE) ? this.addCharacter(ch) : res;
     }
 
     /**
      * Decodes the given byte code to an encoded character.
      *
-     * @param b A byte code of a character.
+     * @param byteCode A byte code of a character.
      *
      * @return Encoded character.
      */
-    public char fastDecode(final byte b) {
-        return byte2char[b & TO_BYTE];
+    public char fastDecode(final byte byteCode) {
+        return byte2char[byteCode & TO_BYTE];
     }
 
     /**
@@ -268,6 +274,7 @@ public class DynamicCharset extends Charset {
 
     /**
      * Encodes characters from the given char sequence into the destination byte array.
+     * 
      * <p>
      * The first character to be encoded is at index <code>srcBegin</code>; the last character to be
      * encoded is at index <code>srcEnd-1</code> (thus the total number of characters to be encoded
@@ -278,18 +285,18 @@ public class DynamicCharset extends Charset {
      *     dstbegin + (srcEnd-srcBegin) - 1
      * </pre></blockquote>
      *
-     * @param s        Characters sequence to encode.
+     * @param src        Characters sequence to encode.
      * @param srcBegin Index of the first character in the string to encode.
      * @param srcEnd   Index after the last character in the string to encode.
      * @param dst      The destination array.
      * @param dstBegin The start offset in the destination array.
      */
-    public void getBytes(final CharSequence s,
+    public void getBytes(final CharSequence src,
                          final int srcBegin, final int srcEnd,
                          final byte[] dst, final int dstBegin) {
         int dstPos = dstBegin;
         for (int i = srcBegin; i < srcEnd; i++, dstPos++) {
-            char c = s.charAt(i);
+            char c = src.charAt(i);
             byte b = (c <= this.maxChar) ? this.char2byte[c] : UNKNOWN_CHARACTER_CODE;
             dst[dstPos] = (this.changeable && b == UNKNOWN_CHARACTER_CODE) ? addCharacter(c) : b;
         }
@@ -350,7 +357,7 @@ public class DynamicCharset extends Charset {
     }
 
     /**
-     * Writes data of this object to the output stream.
+     * Writes a configuration of this charset to the output stream.
      *
      * @param out The output stream.
      *
@@ -371,7 +378,7 @@ public class DynamicCharset extends Charset {
     }
 
     /**
-     * Reads data of this object from the input stream.
+     * Reads a configuration of this charset from the input stream.
      *
      * @param in The input stream.
      *
@@ -470,34 +477,26 @@ public class DynamicCharset extends Charset {
         Charset.forName("UTF-8");
     }
 
-    /**
-     * Characters available on keyboard, polish characters, whitespaces, numbers.
-     */
-    private static final String INTERNATIONAL_ALPHABET
-            = "Aa\u0104\u0105BbCc\u0106\u0107DdEe\u0118\u0119"
-            + "FfGgHhIiJjKkLl\u0141\u0142MmNn\u0143\u0144"
-            + "Oo\u00D3\u00F3PpQqRrSs\u015A\u015BTtUuVvWw"
-            + "XxYyZz\u0179\u017A\u017B\u017C"
-            + "0123456789"
-            + " !\"#$%&'()*+,-./0123456789:;<=>?@"
-            + "\\_[]{}|~`"
-            + "\r\n\t";
 
     /**
      * Sets the international alphabet for this charset. The international alphabet is suitable for
      * an european languages.
      */
     public void setInternational() {
-        for (int i = 0; i < INTERNATIONAL_ALPHABET.length(); i++) {
-            addCharacter(INTERNATIONAL_ALPHABET.charAt(i));
+        addCharacter(' ');
+        addCharacter('\t');
+        addCharacter('\n');
+        addCharacter('\r');
+        for (char ch = 0x20; ch < 0x80; ch++) {
+            addCharacter(ch);
         }
+        for (int i = 0; i < POLISH_ALPHABET.length(); i++) {
+            addCharacter(POLISH_ALPHABET.charAt(i));
+        }
+        
+        
+        
+        
     }
 
-//    public int compareTo(Charset o) {
-//        if (o == null){
-//            return 1;
-//        } else {
-//            return toString().compareTo(o.toString());
-//        }
-//    }
 }

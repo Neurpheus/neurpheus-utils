@@ -22,8 +22,9 @@ import java.util.List;
  * A node of a tree. Each node has a value (any Java object) and collection of child nodes. A leaf
  * is a node without children.
  *
- * @author Jakub Strychowski
  * @param <T> Type of values describing the node.
+ * 
+ * @author Jakub Strychowski
  */
 public interface TreeNode<T> {
 
@@ -66,7 +67,7 @@ public interface TreeNode<T> {
      *
      * @return children of this node.
      */
-    List<TreeNode> getChildren();
+    List<? extends TreeNode> getChildren();
 
     /**
      * Return number of children of this node.
@@ -118,7 +119,7 @@ public interface TreeNode<T> {
      *
      * @exception NullPointerException If the specified {@code children} argument is null.
      */
-    void setChildren(List<TreeNode> children);
+    void setChildren(List<? extends TreeNode> children);
 
     /**
      * Adds a new child node to this node.

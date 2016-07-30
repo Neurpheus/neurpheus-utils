@@ -54,7 +54,7 @@ public final class LoggerService {
     public static synchronized void setLogLevelForConsole(Level level) {
         if (consoleHandler == null) {
             consoleHandler = new ConsoleHandler();
-            //Logger.getAnonymousLogger().addHandler(consoleHandler);        
+            // Logger.getAnonymousLogger().addHandler(consoleHandler);        
             LogManager.getLogManager().getLogger("").addHandler(consoleHandler);
         }
         consoleHandler.setLevel(level);

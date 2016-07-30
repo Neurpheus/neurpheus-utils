@@ -1,5 +1,17 @@
 /*
- *  © 2015 Jakub Strychowski
+ * Neurpheus - Utilities Package
+ *
+ * Copyright (C) 2006-2016 Jakub Strychowski
+ *
+ *  This library is free software; you can redistribute it and/or modify it
+ *  under the terms of the GNU Lesser General Public License as published by the Free
+ *  Software Foundation; either version 3.0 of the License, or (at your option)
+ *  any later version.
+ *
+ *  This library is distributed in the hope that it will be useful, but
+ *  WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ *  or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License
+ *  for more details.
  */
 
 package org.neurpheus.collections.tree.linkedlist;
@@ -22,61 +34,66 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.logging.Level;
+import static org.junit.Assert.assertNotNull;
 
 /**
+ * Tests LLT tree compression and traversal.
  *
- * @author Kuba
+ * @author Jakub Strychowski
  */
 public class LinkedListTreeFactoryTest {
 
-    private static final char[] SUFFIX_ALPHABET = new char[] { 'a', 'e', 'z', 'x', 'c' ,'v' ,'b', 'n', 'm'};
-    private static final char[] THEME_ALPHABET = new char[] { 'a', 'e', 's', 'd' ,'f' ,'g', 'h', 'j', 'k', 'l'};
-    private static final char[] PREFIX_ALPHABET = new char[] { 'w', 'e', 'r', 't', 'y', 'u'};
-    
+    private static final char[] SUFFIX_ALPHABET = 
+            new char[]{'a', 'e', 'z', 'x', 'c', 'v', 'b', 'n', 'm'};
+    private static final char[] THEME_ALPHABET = 
+            new char[]{'a', 'e', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'};
+    private static final char[] PREFIX_ALPHABET = 
+            new char[]{'w', 'e', 'r', 't', 'y', 'u'};
+
     private static final int NUMBER_OF_SUFFIXES = 200;
     private static final int NUMBER_OF_THEMES = 20_000;
     private static final int NUMBER_OF_PREFIXES = 10;
-    
-    private static final int NUMBER_OF_RANDOM_WORDS = 300_000;
+
+    private static final int NUMBER_OF_RANDOM_WORDS = 100_000;
     private static final int NUMBER_OF_WORDS = 10_000_000;
-    
+
     private static final boolean REVERSE = false;
-    
-    private static final String[] EXAMPLES = new String[] {
-      "wysoki",
-      "wysokiego",
-      "wysokiemu",
-      "najwyzszemu",
-      "wysoka",
-      "wysocy",
-      "wysocki",
-      "wysokim",
-      "wysokimi",
-      "niewysoki",
-      "niewysokiego",
-      "niewysokiemu",
-      "nienajwyzszemu",
-      "niewysoka",
-      "niewysocy",
-      "niewysocki",
-      "niewysokim",
-      "niewysokimi"
+
+    private static final String[] EXAMPLES = new String[]{
+        "wysoki",
+        "wysokiego",
+        "wysokiemu",
+        "najwyzszemu",
+        "wysoka",
+        "wysocy",
+        "wysocki",
+        "wysokim",
+        "wysokimi",
+        "niewysoki",
+        "niewysokiego",
+        "niewysokiemu",
+        "nienajwyzszemu",
+        "niewysoka",
+        "niewysocy",
+        "niewysocki",
+        "niewysokim",
+        "niewysokimi"
     };
-    
+
     public LinkedListTreeFactoryTest() {
     }
 
     /**
      * Test of getInstance method, of class LinkedListTreeFactory.
      */
-    //@Test
+    @Test
     public void testCompressSimpleExamples() {
         LoggerService.setLogLevelForConsole(Level.FINER);
         List<String> examples = Arrays.asList(EXAMPLES);
         testExamples(examples, false);
         testExamples(examples, true);
     }
-    
+
     /**
      * Test of getInstance method, of class LinkedListTreeFactory.
      */
@@ -86,16 +103,14 @@ public class LinkedListTreeFactoryTest {
         List<String> examples = generateExamples();
         testExamples(examples, false);
     }
-    
-    
+
     /**
      * Test of getInstance method, of class LinkedListTreeFactory.
      */
-    //@Test
+    @Test
     public void testCompress3() {
         LoggerService.setLogLevelForConsole(Level.FINER);
-        
-        
+
         URL url = ClassLoader.getSystemResource("");
         File folder = null;
         try {
@@ -106,17 +121,18 @@ public class LinkedListTreeFactoryTest {
         String resourcePath = folder.getAbsolutePath() + File.separator;
 
         String path = resourcePath + "english.txt";
-        
+
         //path = "c:/projekty/neurpheus/neurpheus-utils/data/full_pl_PL.all";
         //path = "c:/projekty/neurpheus/neurpheus-utils/data/en_GB.all";
         //path = "c:/projekty/neurpheus/neurpheus-utils/data/data-sets/weiss/wikipedia.txt";
         //path = "c:/projekty/neurpheus/neurpheus-utils/data/data-sets/weiss/polish.txt";
         //path = "c:/projekty/neurpheus/neurpheus-utils/data/data-sets/weiss/random.txt";
-        
-         
-
         try {
-            String result = LinkedListTreeTools.testTreeCreation(path, REVERSE, true);
+            String result = LinkedListTreeTools.testTreeCreation(path, REVERSE, true, false, false);
+            if (result != null) {
+                fail(result);
+            }
+            result = LinkedListTreeTools.testTreeCreation(path, REVERSE, true, false, true);
             if (result != null) {
                 fail(result);
             }
@@ -124,32 +140,45 @@ public class LinkedListTreeFactoryTest {
             ex.printStackTrace();
             fail("IOException: " + ex.getMessage());
         }
-        
+
     }
-    
-    
+
     private void testExamples(List<String> examples, boolean parallelMode) {
         System.out.println("--------------------------------------------");
         System.out.printf("Test %d words%n", examples.size());
         System.out.println("--------------------------------------------");
-        Tree baseTree = LinkedListTreeTools.createBaseTree(examples, REVERSE);
-        Tree compressedTree = LinkedListTreeFactory.getInstance().createTree(baseTree, true, true, parallelMode);
-        
+        Tree baseTree = LinkedListTreeTools.createBaseTree(examples, REVERSE, true);
+        LinkedListTree compressedTree = LinkedListTreeFactory.getInstance().createTree(
+                baseTree, true, true, parallelMode);
+
+        int stack[] = new int[1000];
+
         for (String example : examples) {
-            TreeNode node = LinkedListTreeTools.findNode(example, compressedTree, REVERSE);
+            TreeNode node = LinkedListTreeTools.findNode(example, compressedTree, REVERSE, null);
             assertTrue("Cannot find string: " + example, node != null);
+
+            node = LinkedListTreeTools.findNode(example, compressedTree, REVERSE, null, stack);
+            assertTrue("Cannot find string: " + example, node != null);
+            
+            String path = example;
+            if (REVERSE) {
+                path = new StringBuilder(path).reverse().toString();
+            }
+            
+            Integer v = compressedTree.getRoot().getData(path, stack, 0);
+            assertNotNull(v);
+
         }
     }
-    
-    
+
     private List<String> generateExamples() {
-        
+
         List<String> suffixes = generateStrings(SUFFIX_ALPHABET, 0, 4, NUMBER_OF_SUFFIXES);
         List<String> themes = generateStrings(THEME_ALPHABET, 1, 8, NUMBER_OF_THEMES);
         List<String> prefixes = generateStrings(PREFIX_ALPHABET, 1, 8, NUMBER_OF_PREFIXES);
-        
+
         Set<String> result = new HashSet<>();
-        
+
         int i = NUMBER_OF_RANDOM_WORDS;
         while (i > 0) {
             String theme = themes.get((int) Math.floor(Math.random() * themes.size()));
@@ -160,13 +189,13 @@ public class LinkedListTreeFactoryTest {
                 i--;
             }
         }
-        
+
         return new ArrayList(result);
-        
+
     }
-    
-    private List<String> generateStrings(char[] alphabet, int minLength, int  maxLength, 
-                                                                        int numberOfStrings) {
+
+    private List<String> generateStrings(char[] alphabet, int minLength, int maxLength,
+                                         int numberOfStrings) {
         Set<String> result = new HashSet<String>();
         double lengthRange = maxLength - minLength;
         int alphabetSize = alphabet.length;
@@ -187,5 +216,4 @@ public class LinkedListTreeFactoryTest {
         return new ArrayList(result);
     }
 
-    
 }

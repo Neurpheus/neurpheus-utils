@@ -1,7 +1,7 @@
 /*
  * Neurpheus - Utilities Package
  *
- * Copyright (C) 2006-2015 Jakub Strychowski
+ * Copyright (C) 2006-2016 Jakub Strychowski
  *
  *  This library is free software; you can redistribute it and/or modify it
  *  under the terms of the GNU Lesser General Public License as published by the Free
@@ -23,7 +23,9 @@ package org.neurpheus.core.string;
  */
 public final class StringHelper {
 
-    /** Creates a new instance of StringHelper */
+    /** 
+     * This class cannot be instanced.
+     */
     private StringHelper() {
     }
 
@@ -35,11 +37,11 @@ public final class StringHelper {
      * @return The string containing characters in reverse order.
      */
     public static String reverseString(final String txt) {
-        StringBuffer tmp = new StringBuffer(txt.length());
-        for (int i = txt.length() - 1; i >= 0; i--) {
-            tmp.append(txt.charAt(i));
+        if (txt == null) {
+            throw new NullPointerException("Cannt perform reverse operation on null string.");
         }
-        return tmp.toString();
+        StringBuilder tmp = new StringBuilder(txt);
+        return tmp.reverse().toString();
     }
 
 }

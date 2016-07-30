@@ -1,7 +1,7 @@
 /*
  * Neurpheus - Utilities Package
  *
- * Copyright (C) 2006-2015 Jakub Strychowski
+ * Copyright (C) 2006-2016 Jakub Strychowski
  *
  *  This library is free software; you can redistribute it and/or modify it
  *  under the terms of the GNU Lesser General Public License as published by the Free
@@ -19,23 +19,41 @@ package org.neurpheus.collections.tree.linkedlist;
 import org.neurpheus.collections.tree.TreeNodeWithData;
 
 /**
+ * Represents a single node holding data in a linked list tree.
  *
- * @author szkoleniowy
+ * @author Jakub Strychowski
  */
-public class LinkedListTreeDataNode extends LinkedListTreeNode implements TreeNodeWithData {
+public class LinkedListTreeDataNode
+        extends LinkedListTreeNode
+        implements TreeNodeWithData<Integer, Integer> {
 
-    public LinkedListTreeDataNode(LinkedListPosition pos) {
+    /**
+     * Constructs a new data node defined at the specified LLT position.
+     *
+     * @param pos Information about a position in a LLT unit array and traversal history.
+     */
+    LinkedListTreeDataNode(LinkedListPosition pos) {
         super(pos);
     }
 
     @Override
-    public Object getData() {
-        return new Integer(getUnit().getDataCode());
+    public Integer getData() {
+        return getUnit().getDataCode();
     }
 
+    /**
+     * This method is not supported for this implementation of the {@link TreeNode} interface.
+     * <p>
+     * A tree should be constructed by the      
+     * {@link LinkedListTreeFactory#createTree(org.neurpheus.collections.tree.Tree, 
+     * boolean, boolean, boolean)} method using any source/base tree.
+     * </p>
+     *
+     * @exception UnsupportedOperationException
+     */
     @Override
-    public void setData(Object newData) {
-        getUnit().setDataCode(((Integer) newData).intValue());
+    public void setData(Integer newData) {
+        throw new UnsupportedOperationException();
     }
 
     @Override

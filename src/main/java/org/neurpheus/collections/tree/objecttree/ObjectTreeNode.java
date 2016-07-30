@@ -116,13 +116,13 @@ public class ObjectTreeNode<T> implements TreeNode<T>, Serializable, Comparable 
      * @return List of children nodes or empty list if this node is a leaf.
      */
     @Override
-    public List<TreeNode> getChildren() {
+    public List<ObjectTreeNode> getChildren() {
         if (children == null) {
             return Collections.emptyList();
         } else if (children instanceof ObjectTreeNode) {
-            return Collections.singletonList((TreeNode) children);
+            return Collections.singletonList((ObjectTreeNode) children);
         } else {
-            return (List<TreeNode>) children;
+            return (List<ObjectTreeNode>) children;
         }
     }
 

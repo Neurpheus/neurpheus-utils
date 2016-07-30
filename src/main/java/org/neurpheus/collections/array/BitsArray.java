@@ -51,6 +51,9 @@ public class BitsArray implements Serializable {
     /** Unique serialization identifier of this class. */
     static final long serialVersionUID = 770608061016143242L;
 
+    /** Estimated memory occupied by internal objects of this objects. */
+    public static final int BASE_ALLOCATION_SIZE = 4 + 24 + 4;
+    
     /** Backing array - each element holds 64 bits. **/
     private long[] data;
 
@@ -174,7 +177,7 @@ public class BitsArray implements Serializable {
      * @return Number of bytes occupied by this structure.
      */
     public long getAllocationSize() {
-        return 8 + (data == null ? 0 : 8 + data.length * 8);
+        return BASE_ALLOCATION_SIZE + (data == null ? 0 : 8 + data.length * 8);
     }
 
     /**
