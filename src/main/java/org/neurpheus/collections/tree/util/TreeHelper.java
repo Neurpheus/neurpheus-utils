@@ -106,7 +106,7 @@ public class TreeHelper {
     private static void printWords(TreeNode node, PrintStream out, String prefix,
                                    TreeNodePrinter nodePrinter) {
         String tmp = prefix + nodePrinter.getValueString(node.getValue());
-        if (node.isLeaf()) {
+        if (node.isLeaf() || node.hasExtraData()) {
             out.println(tmp);
         }
         for (Iterator it = node.getChildren().iterator(); it.hasNext();) {
@@ -141,7 +141,7 @@ public class TreeHelper {
     private static void getWords(TreeNode node, Collection result, String prefix,
                                  TreeNodePrinter nodePrinter) {
         String tmp = prefix + nodePrinter.getValueString(node.getValue());
-        if (node.isLeaf()) {
+        if (node.hasExtraData() || node.isLeaf()) {
             result.add(tmp);
         }
         for (Iterator it = node.getChildren().iterator(); it.hasNext();) {
