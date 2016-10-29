@@ -19,6 +19,7 @@ package org.neurpheus.core.charset;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.Serializable;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CharsetEncoder;
@@ -58,7 +59,7 @@ import java.util.Arrays;
  *
  * @author Jakub Strychowski
  */
-public class DynamicCharset extends Charset {
+public class DynamicCharset extends Charset implements Serializable {
 
     /** The byte code of a character which dose not have mapping. */
     public static final byte UNKNOWN_CHARACTER_CODE = 0;
@@ -96,10 +97,10 @@ public class DynamicCharset extends Charset {
     private boolean changeable;
 
     /** Holds the encoder returned by this object. */
-    private DynamicCharsetEncoder encoder;
+    private transient DynamicCharsetEncoder encoder;
 
     /** Holds the decoder returned by this object. */
-    private DynamicCharsetDecoder decoder;
+    private transient DynamicCharsetDecoder decoder;
 
     /**
      * Initializes a new charset with the given canonical name and alias set.
