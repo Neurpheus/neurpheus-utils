@@ -26,9 +26,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.neurpheus.collections.tree.objecttree.ObjectTree;
 
 /**
  * A class factory responsible for creating linked list tree.
@@ -151,6 +153,7 @@ public class LinkedListTreeFactory implements TreeFactory {
         TreeNode rootNode = baseTree.getRoot();
         Map<Integer, Integer> valueMapping = new HashMap<>();
         valueMapping.put(0, 0);
+        convertCharToInteger(rootNode);
         createTreeFromNode(rootNode, unitArray, clearBaseTree, valueMapping);
         LinkedListTree llt = new LinkedListTree();
         llt.setUnitArray(unitArray);
@@ -167,6 +170,16 @@ public class LinkedListTreeFactory implements TreeFactory {
         }
 
         return llt;
+    }
+    
+    private void convertCharToInteger(TreeNode node) {
+        Object value = node.getValue();
+        if (value instanceof Character) {
+            node.setValue(new Integer(((Character) value).charValue()));
+        }
+        for (TreeNode child : (List<TreeNode>) node.getChildren()) {
+            convertCharToInteger(child);
+        }
     }
 
     /**
