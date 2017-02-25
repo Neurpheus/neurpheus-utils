@@ -121,6 +121,9 @@ class LinkedListPosition {
     }
 
     protected  LinkedListPosition goToNextChild() {
+        if (!absProcessed) {
+            processAbsolutePointer();
+        }
         int d = unitArray.getDistance(pos);
         if (d > 0) {
             int target = pos + d;
@@ -251,4 +254,15 @@ class LinkedListPosition {
         return false;
     }
 
+    public String toString() {
+        StringBuilder result = new StringBuilder();
+        result.append("{pos: ").append(pos);
+        result.append(",absProcessed: ").append(absProcessed);
+        result.append(",nested: ").append(nested);
+        result.append(",unitsToRead: ").append(unitsToRead);
+        result.append(",returnPos: ").append(returnPos == null ? "null" : returnPos.toString());
+        result.append("}");
+        return result.toString();
+    }
+    
 }

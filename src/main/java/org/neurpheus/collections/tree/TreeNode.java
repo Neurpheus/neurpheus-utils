@@ -96,6 +96,7 @@ public interface TreeNode<T> {
      * @param fromNode Star searching from the given node on a list of child nodes.
      *
      * @return Found child node or null if this node doesn't have any node with the given value.
+     * @deprecated Deprecated because LLT implementation of this method cause some errors
      */
     TreeNode getChild(T key, TreeNode fromNode);
 

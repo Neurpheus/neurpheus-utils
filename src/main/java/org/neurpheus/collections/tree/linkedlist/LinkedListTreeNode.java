@@ -130,7 +130,6 @@ public class LinkedListTreeNode implements TreeNode<Integer> {
             if (childPosition != null) {
                 int keyValue = key;
                 keyValue = pos.getUnitArray().mapToValueCode(keyValue);
-
                 while (childPosition != null) {
                     int valueCode = childPosition.getValueMapped();
                     if (valueCode == keyValue) {
@@ -147,25 +146,30 @@ public class LinkedListTreeNode implements TreeNode<Integer> {
 
     @Override
     public LinkedListTreeNode getChild(final Integer key, final TreeNode fromNode) {
+        //return getChild(key); 
         if (fromNode == null) {
             return getChild(key);
         } else {
-            LinkedListPosition childPosition;
-            childPosition = new LinkedListPosition(((LinkedListTreeNode) fromNode).pos);
-            childPosition = childPosition.goToNextChild();
-            int keyValue = key;
-            keyValue = pos.getUnitArray().mapToValueCode(keyValue);
-            while (childPosition != null) {
-                int valueCode = childPosition.getValueMapped();
-                if (valueCode == keyValue) {
-                    return childPosition.isWordEnd() 
-                            ? new LinkedListTreeDataNode(childPosition) 
-                            : new LinkedListTreeNode(childPosition);
+            if (pos.isWordContinued()) {
+                LinkedListPosition childPosition = new LinkedListPosition(((LinkedListTreeNode) fromNode).pos);
+                childPosition = childPosition.goToNextChild();
+                if (childPosition != null) {
+                    int keyValue = key;
+                    keyValue = pos.getUnitArray().mapToValueCode(keyValue);
+                    while (childPosition != null) {
+                        int valueCode = childPosition.getValueMapped();
+                        if (valueCode == keyValue) {
+                            return childPosition.isWordEnd()
+                                    ? new LinkedListTreeDataNode(childPosition)
+                                    : new LinkedListTreeNode(childPosition);
+                        }
+                        childPosition = valueCode < keyValue ? childPosition.goToNextChild() : null;
+                    }
                 }
-                childPosition = valueCode < keyValue ? childPosition.goToNextChild() : null;
             }
             return null;
         }
+        //*/
     }
 
 
@@ -190,6 +194,18 @@ public class LinkedListTreeNode implements TreeNode<Integer> {
         int nested = pos.getNested() ? 1 : 0;
         int unitsToRead = pos.getUnitsToRead();
         LinkedListPosition returnPos = pos.getReturnPos();
+        // process absolute pointer
+        while (index < unitsSize && units.isAbsolutePointerFast(fastIndex)) {
+            if (nested == 0 || unitsToRead > 1) {
+                stack[++stackPos] = index + 1;
+                stack[++stackPos] = nested;
+                stack[++stackPos] = unitsToRead - 1;
+            }
+            unitsToRead = units.getValueCodeFast(fastIndex);
+            nested = unitsToRead != 0 ? 1 : 0;
+            index = units.getDistanceFast(fastIndex);
+            fastIndex = units.getFastIndex(index);
+        }
         if (units.isWordContinuedFast(fastIndex)) {
             int cint = key;
             cint = units.mapToValueCode(cint);
@@ -310,6 +326,7 @@ public class LinkedListTreeNode implements TreeNode<Integer> {
                        "common-java:DuplicatedBlocks", 
                        "squid:S134"})
     public Integer getData(String path, int[] stack, int stackPos) {
+        int startStackPos = stackPos;
         LinkedListTreeUnitArray units = pos.getUnitArray();
         int unitsSize = units.size();
         int index = pos.getPos();
@@ -319,13 +336,39 @@ public class LinkedListTreeNode implements TreeNode<Integer> {
         for (int i = 0; i < path.length(); i++) {
             int cint = (int) path.charAt(i);
             cint = units.mapToValueCode(cint);
+            // process absolute pointer
+            // TODO - cover by unit test from here to next comment
+            while (index < unitsSize && units.isAbsolutePointerFast(fastIndex)) {
+                if (nested == 0 || unitsToRead > 1) {
+                    stack[++stackPos] = index + 1;
+                    stack[++stackPos] = nested;
+                    stack[++stackPos] = unitsToRead - 1;
+                }
+                unitsToRead = units.getValueCodeFast(fastIndex);
+                nested = unitsToRead != 0 ? 1 : 0;
+                index = units.getDistanceFast(fastIndex);
+                fastIndex = units.getFastIndex(index);
+            }
             // go to next level
             if (units.isWordContinuedFast(fastIndex)) {
                 if (nested == 1 && unitsToRead <= 1) {
                     // return from the absolute pointer
-                    unitsToRead = stack[stackPos--];
-                    nested = stack[stackPos--];
-                    index = stack[stackPos--];
+                    if (stackPos <= startStackPos) {
+                        LinkedListPosition returnPos = pos.getReturnPos();
+                        if (returnPos != null) {
+                            unitsToRead = returnPos.getUnitsToRead();
+                            nested = returnPos.getNested() ? 1 : 0;
+                            index = returnPos.getPos();
+                        } else {
+                            // not matched
+                            return null;
+                        }
+                    } else {
+                        unitsToRead = stack[stackPos--];
+                        nested = stack[stackPos--];
+                        index = stack[stackPos--];
+                    }
+                    
                 } else {
                     ++index;
                     --unitsToRead;
@@ -359,9 +402,31 @@ public class LinkedListTreeNode implements TreeNode<Integer> {
                     // go to next child (getData)
                     int distance = units.getDistanceFast(fastIndex);
                     if (distance > 0) {
-                        index += distance;
-                        unitsToRead -= distance;
+                        int target = index + distance;
+                        if (nested == 1 && unitsToRead > 0 && target >= index + unitsToRead) {
+                            // return from the absolute pointer
+                            if (stackPos <= startStackPos) {
+                                LinkedListPosition returnPos = pos.getReturnPos();
+                                if (returnPos != null) {
+                                    unitsToRead = returnPos.getUnitsToRead();
+                                    nested = returnPos.getNested() ? 1 : 0;
+                                    index = returnPos.getPos();
+                                    returnPos = returnPos.getReturnPos();
+                                } else {
+                                    // not matched
+                                    return null;
+                                }
+                            } else {
+                                unitsToRead = stack[stackPos--];
+                                nested = stack[stackPos--];
+                                index = stack[stackPos--];
+                            }
+                        } else {
+                            index = target;
+                            unitsToRead = unitsToRead - distance;
+                        }
                         fastIndex = units.getFastIndex(index);
+                        
                     } else {
                         // not matched
                         return null;
