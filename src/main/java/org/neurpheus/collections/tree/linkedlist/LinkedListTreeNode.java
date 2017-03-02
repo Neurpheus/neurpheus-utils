@@ -19,6 +19,7 @@ package org.neurpheus.collections.tree.linkedlist;
 import org.neurpheus.collections.tree.TreeNode;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -311,6 +312,159 @@ public class LinkedListTreeNode implements TreeNode<Integer> {
         return null;
     }
 
+    /**
+     * Returns a child which contains specified key.
+     *
+     * @param key      The transition key to the child.
+     * @param stack    Stack used for fast recursion.
+     * @param stackPos Current position in the stack
+     *
+     * @return The child or null if there is no child containing specified key.
+     */
+    @SuppressWarnings({"squid:MethodCyclomaticComplexity", 
+                       "common-java:DuplicatedBlocks", 
+                       "squid:S134"})
+    public void findChildren(final int[] keys, final LinkedListTreeNode[] foundChildren, 
+                                               final int[] stack, int stackPos) {
+        final LinkedListTreeUnitArray units = pos.getUnitArray();
+        final int unitsSize = units.size();
+        final int startStackPos = stackPos;
+        int index = pos.getPos();
+        int fastIndex = units.getFastIndex(index);
+        int nested = pos.getNested() ? 1 : 0;
+        int unitsToRead = pos.getUnitsToRead();
+        LinkedListPosition returnPos = pos.getReturnPos();
+        // process absolute pointer
+        while (index < unitsSize && units.isAbsolutePointerFast(fastIndex)) {
+            if (nested == 0 || unitsToRead > 1) {
+                stack[++stackPos] = index + 1;
+                stack[++stackPos] = nested;
+                stack[++stackPos] = unitsToRead - 1;
+            }
+            unitsToRead = units.getValueCodeFast(fastIndex);
+            nested = unitsToRead != 0 ? 1 : 0;
+            index = units.getDistanceFast(fastIndex);
+            fastIndex = units.getFastIndex(index);
+        }
+        Arrays.fill(foundChildren, null);
+        int numberOfKeys = keys.length;
+        if (units.isWordContinuedFast(fastIndex)) {
+            // go to next level
+            if (nested == 1 && unitsToRead <= 1) {
+                // return from the absolute pointer
+                if (stackPos <= startStackPos) {
+                    if (returnPos != null) {
+                        unitsToRead = returnPos.getUnitsToRead();
+                        nested = returnPos.getNested() ? 1 : 0;
+                        index = returnPos.getPos();
+                        returnPos = returnPos.getReturnPos();
+                    } else {
+                        // not matched
+                        return;
+                    }
+                } else {
+                    unitsToRead = stack[stackPos--];
+                    nested = stack[stackPos--];
+                    index = stack[stackPos--];
+                }
+            } else {
+                ++index;
+                --unitsToRead;
+            }
+            fastIndex = units.getFastIndex(index);
+
+            int keyIndex = 0;
+            int cint = keys[keyIndex];
+            cint = units.mapToValueCode(cint);
+            while (keyIndex < numberOfKeys) {
+                
+                // process absolute pointer
+                while (index < unitsSize && units.isAbsolutePointerFast(fastIndex)) {
+                    if (nested == 0 || unitsToRead > 1) {
+                        stack[++stackPos] = index + 1;
+                        stack[++stackPos] = nested;
+                        stack[++stackPos] = unitsToRead - 1;
+                    }
+                    unitsToRead = units.getValueCodeFast(fastIndex);
+                    nested = unitsToRead != 0 ? 1 : 0;
+                    index = units.getDistanceFast(fastIndex);
+                    fastIndex = units.getFastIndex(index);
+                }
+                
+                // get key (getChild)
+                int vc = units.getValueCodeFast(fastIndex);
+                
+                // move to next key
+                while (vc >= cint && keyIndex < numberOfKeys) {
+                    if (vc == cint) {
+                        // found = true
+                        LinkedListPosition retPos = returnPos == null ? null : new LinkedListPosition(
+                                returnPos);
+                        LinkedListPosition position = new LinkedListPosition(units, index, retPos,
+                                                                             unitsToRead,
+                                                                             nested == 1);
+                        LinkedListTreeNode child = 
+                                units.isWordEndFast(fastIndex) 
+                                ? new LinkedListTreeDataNode(position) :
+                                new LinkedListTreeNode(position);
+                        position.setAbsProcessed(true);
+                        // determine return position
+                        int stackPos2 = stackPos;
+                        while (stackPos2 > startStackPos) {
+                            int unitsToRead2 = stack[stackPos2--];
+                            int nested2 = stack[stackPos2--];
+                            int index2 = stack[stackPos2--];
+                            LinkedListPosition tmp = 
+                                new LinkedListPosition(units, index2, retPos, unitsToRead2, nested2 == 1);
+                            position.setReturnPos(tmp);
+                            position = tmp;
+                        }
+                        foundChildren[keyIndex] = child;
+                    } 
+                    keyIndex++;
+                    if (keyIndex < numberOfKeys) {
+                        cint = keys[keyIndex];
+                        cint = units.mapToValueCode(cint);
+                    } else {
+                        return;
+                    }
+                }
+
+                // go to next child (getChild)
+                int distance = units.getDistanceFast(fastIndex);
+                if (distance > 0) {
+                    int target = index + distance;
+                    if (nested == 1 && unitsToRead > 0 && target >= index + unitsToRead) {
+                        // return from the absolute pointer
+                        if (stackPos <= startStackPos) {
+                            if (returnPos != null) {
+                                unitsToRead = returnPos.getUnitsToRead();
+                                nested = returnPos.getNested() ? 1 : 0;
+                                index = returnPos.getPos();
+                                returnPos = returnPos.getReturnPos();
+                            } else {
+                                // not matched
+                                return;
+                            }
+                        } else {
+                            unitsToRead = stack[stackPos--];
+                            nested = stack[stackPos--];
+                            index = stack[stackPos--];
+                        }
+                    } else {
+                        index = target;
+                        unitsToRead = unitsToRead - distance;
+                    }
+                    fastIndex = units.getFastIndex(index);
+                } else {
+                    // not matched
+                    return;
+                }
+                
+            }
+        }
+    }
+    
     /**
      * Returns data stored in a tree at the specified location starting from the current node.
      * 

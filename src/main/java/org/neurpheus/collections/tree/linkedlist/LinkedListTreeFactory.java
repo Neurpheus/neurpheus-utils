@@ -26,8 +26,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.neurpheus.collections.tree.objecttree.ObjectTree;
@@ -151,9 +153,10 @@ public class LinkedListTreeFactory implements TreeFactory {
         unit.setWordContinued(true);
         unitArray.add(unit);
         TreeNode rootNode = baseTree.getRoot();
-        Map<Integer, Integer> valueMapping = new HashMap<>();
-        valueMapping.put(0, 0);
-        convertCharToInteger(rootNode);
+        Set<Integer> allValues = new HashSet<>();
+        allValues.add(0);
+        convertCharToInteger(rootNode, allValues);
+        Map<Integer, Integer> valueMapping = createMapping(allValues);
         createTreeFromNode(rootNode, unitArray, clearBaseTree, valueMapping);
         LinkedListTree llt = new LinkedListTree();
         llt.setUnitArray(unitArray);
@@ -172,16 +175,33 @@ public class LinkedListTreeFactory implements TreeFactory {
         return llt;
     }
     
-    private void convertCharToInteger(TreeNode node) {
+    private void convertCharToInteger(TreeNode node, Set<Integer> allValues) {
         Object value = node.getValue();
         if (value instanceof Character) {
-            node.setValue(new Integer(((Character) value).charValue()));
+            value = new Integer(((Character) value).charValue());
+            node.setValue(value);
+        }
+        if (value instanceof Number) {
+            allValues.add(((Number) value).intValue());
         }
         for (TreeNode child : (List<TreeNode>) node.getChildren()) {
-            convertCharToInteger(child);
+            convertCharToInteger(child, allValues);
         }
     }
 
+    private Map<Integer, Integer> createMapping(Set<Integer> allValues) {
+        Map<Integer, Integer> valueMapping = new HashMap<>();
+        ArrayList<Integer> values = new ArrayList<>(allValues);
+        Collections.sort(values);
+        int index = 0;
+        for (Integer value : values) {
+            valueMapping.put(value, index++);
+        }
+        return valueMapping;
+    }
+    
+    
+    
     /**
      * Recurrent method which traverse nodes of the base tree and creates linked list tree.
      *

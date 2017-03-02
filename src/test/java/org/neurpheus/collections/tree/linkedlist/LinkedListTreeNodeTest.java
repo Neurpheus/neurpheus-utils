@@ -46,6 +46,13 @@ public class LinkedListTreeNodeTest {
                 "wysockich",
                 "wysocki",
                 "wysokim",
+                "wysokim1",
+                "wysokim2",
+                "wysokim3",
+                "wysokim4",
+                "wysokim5",
+                "wysokim6",
+                "wysokim7",
                 "wysokimi",
                 "niewysoki",
                 "niewysokiego",
@@ -353,6 +360,42 @@ public class LinkedListTreeNodeTest {
         }
     }
 
+    @Test
+    public void testFindChildren() {
+        int[] stack = new int[1000];
+        ArrayDeque<LinkedListTreeNode> nodes = new ArrayDeque<>();
+        nodes.push(root);
+        while (!nodes.isEmpty()) {
+            LinkedListTreeNode node = nodes.pop();
+            List<LinkedListTreeNode> children = node.getChildren();
+            int size = children.size();
+            if (size > 0) {
+                
+                if (size > 2) {
+                    System.out.println("Size= " + size);
+                }
+                
+                for (LinkedListTreeNode child : children) {
+                    nodes.push(child);
+                }
+                int[] keys = new int[(1 + size) / 2];
+                for (int i = 0; i < size; i++) {
+                    if (i % 2 == 0) {
+                        keys[i / 2] = children.get(i).getValue();
+                    }
+                }
+                LinkedListTreeNode[] foundChildren = new LinkedListTreeNode[keys.length];
+                node.findChildren(keys, foundChildren, stack, size);
+
+                for (int i = 0; i < foundChildren.length; i++) {
+                    LinkedListTreeNode child = foundChildren[i];
+                    LinkedListTreeNode childBis = node.getChild(child.getValue(), stack, 0);
+                    assertEquals(child, childBis);
+                }
+            }
+        }
+    }
+    
     @Test
     public void testEquals() {
         assertEquals(root, root);
